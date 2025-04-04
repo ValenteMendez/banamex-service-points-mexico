@@ -446,10 +446,37 @@ def create_folium_map(df, center, zoom, map_type='clusters', bank_color_map=None
     if map_df.empty:
         st.warning(f"No data points to display on the map for the selected filters (State: {selected_state}, Banks: {filtered_banks if filtered_banks else 'All'}).")
         # Provide a default map centered on Mexico using the passed center/zoom
-        return folium.Map(location=center, zoom_start=zoom, tiles=base_map_tile)
+        empty_map = folium.Map(location=center, zoom_start=zoom, tiles=base_map_tile)
+        
+        # Add a title indicating no banks to display
+        title_html = f'''
+        <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index:9999; 
+                    background-color: rgba(255, 255, 255, 0.8); padding: 10px 15px; 
+                    border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+            No banks to display for the selected filters
+        </div>
+        '''
+        empty_map.get_root().html.add_child(folium.Element(title_html))
+        
+        return empty_map
 
     # Create map using provided center and zoom
     m = folium.Map(location=center, zoom_start=zoom, tiles=base_map_tile)
+    
+    # Add a title showing which banks are being displayed
+    banks_displayed = map_df['banco'].unique()
+    banks_list = ", ".join(sorted(banks_displayed))
+    state_info = f" in {selected_state}" if selected_state != "All States" else ""
+    title_html = f'''
+    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index:9999; 
+                background-color: rgba(255, 255, 255, 0.8); padding: 10px 15px; 
+                border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        Displaying: {banks_list}{state_info}
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(title_html))
 
     if bank_color_map is None:
         # If no color map provided, generate one (might happen for overview map)
@@ -1904,7 +1931,7 @@ def run_streamlit_ui():
             x_metric = st.selectbox(
                 "X-axis:",
                 options=["Población", "Población_adulta", "Superficie_km2", "Urbanización_porcentaje", "PIB_per_cápita"],
-                index=0,
+                index=0,  # Default to "Población" (Total Population)
                 format_func=lambda x: {
                     "Población": "Total Population", 
                     "Población_adulta": "Adult Population",
@@ -1918,7 +1945,7 @@ def run_streamlit_ui():
             y_metric = st.selectbox(
                 "Y-axis:",
                 options=["Sucursales_por_100k", "Urbanización_porcentaje", "Población_adulta_porcentaje", "PIB_per_cápita"],
-                index=0,
+                index=2,  # Default to "Población_adulta_porcentaje" (Adult Population %)
                 format_func=lambda x: {
                     "Sucursales_por_100k": "Branches per 100k People",
                     "Urbanización_porcentaje": "Urbanization (%)",
@@ -1931,7 +1958,7 @@ def run_streamlit_ui():
             size_metric = st.selectbox(
                 "Bubble size:",
                 options=["Superficie_km2", "Población", "Número_de_sucursales"],
-                index=2,
+                index=0,  # Default to "Superficie_km2" (Area in km²)
                 format_func=lambda x: {
                     "Superficie_km2": "Area (km²)",
                     "Población": "Total Population",
@@ -2174,6 +2201,18 @@ def run_streamlit_ui():
                     original_state_df['longitud'].mean() if not original_state_df.empty else -102.5528
                 ]
                 empty_map = folium.Map(location=state_center, zoom_start=7)
+                
+                # Add a title indicating no banks to display
+                title_html = f'''
+                <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index:9999; 
+                            background-color: rgba(255, 255, 255, 0.8); padding: 10px 15px; 
+                            border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                    No banks to display for the selected filters
+                </div>
+                '''
+                empty_map.get_root().html.add_child(folium.Element(title_html))
+                
                 return empty_map, True
             
             # Create a map centered on the state with the branches
@@ -2186,8 +2225,25 @@ def run_streamlit_ui():
                 prefer_canvas=True  # Use canvas renderer for better performance
             )
             
+            # Add a title showing which banks are being displayed
+            banks_displayed = map_df['banco'].unique()
+            banks_list = ", ".join(sorted(banks_displayed)) if len(banks_displayed) <= 8 else f"{len(banks_displayed)} banks"
+            state_info = state_name if state_name != "All States" else "Mexico"
+            title_html = f'''
+            <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index:9999; 
+                        background-color: rgba(255, 255, 255, 0.8); padding: 10px 15px; 
+                        border-radius: 5px; font-size: 16px; font-weight: bold; text-align: center;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                Displaying: {banks_list} in {state_info}
+            </div>
+            '''
+            m.get_root().html.add_child(folium.Element(title_html))
+            
             # Create a feature group for each bank for easy filtering
             all_bank_groups = {}
+            
+            # Get consistent colors for banks
+            bank_color_map = get_bank_colors(map_df['banco'])
             
             # Reduce the number of bank groups if there are too many
             unique_banks = map_df['banco'].unique()
@@ -2215,47 +2271,73 @@ def run_streamlit_ui():
                     all_bank_groups[bank] = bank_group
                     m.add_child(bank_group)
             
-            # Add markers in batches for performance
-            batch_size = 100
+            # Create a separate circle layer that will be added first (at the bottom layer)
+            circles_group = folium.FeatureGroup(name="Accessibility Circles")
             
-            # Process in batches to avoid freezing
+            # Add all the circles to this base layer first
+            batch_size = 100
+            for i in range(0, len(map_df), batch_size):
+                batch = map_df.iloc[i:i+batch_size]
+                
+                for _, row in batch.iterrows():
+                    # Create a circle to represent the isochrone
+                    folium.Circle(
+                        location=[row['latitud'], row['longitud']],
+                        radius=radius_m,  # Use calculated radius in meters
+                        color='green' if transport_mode == "Walking" else 'orange',
+                        fill=True,
+                        fill_color='green' if transport_mode == "Walking" else 'orange',
+                        fill_opacity=0.1,
+                        weight=1,  # Thinner border for performance
+                        popup=f"{time_radius_min} min {transport_mode.lower()} distance",
+                        z_index_offset=-1000  # Ensure circles are at the bottom
+                    ).add_to(circles_group)
+            
+            # Add the circles layer FIRST to the map (will be at the bottom)
+            m.add_child(circles_group)
+            
+            # Create a marker layer that will ALWAYS be on top
+            marker_group = folium.FeatureGroup(name="Branch Markers")
+            
+            # Add all the markers directly to the top layer
             for i in range(0, len(map_df), batch_size):
                 batch = map_df.iloc[i:i+batch_size]
                 
                 for _, row in batch.iterrows():
                     bank = row['banco']
                     
-                    # Determine which group this bank belongs to
+                    # Get color for this bank
+                    bank_color = bank_color_map.get(bank, '#808080')  # Default to gray if not found
+                    
+                    # Create marker for this branch (with VERY HIGH z-index)
+                    folium.CircleMarker(
+                        location=[row['latitud'], row['longitud']],
+                        radius=5,
+                        color=bank_color,
+                        fill=True,
+                        fill_color=bank_color,
+                        fill_opacity=0.9,  # More opaque to be more visible
+                        popup=f"<b>{bank}</b><br>{row['nombre']}",
+                        tooltip=bank,
+                        z_index_offset=1000000  # Very high z-index to ensure it's on top
+                    ).add_to(marker_group)
+                    
+                    # Also add to bank group for toggle functionality (invisible version)
                     if bank in all_bank_groups:
                         bank_group = all_bank_groups[bank]
                     else:
                         bank_group = all_bank_groups.get("Others", all_bank_groups[list(all_bank_groups.keys())[0]])
                     
-                    # Add a marker for each branch - simpler for performance
+                    # Add invisible marker to bank group just for toggling
                     folium.CircleMarker(
                         location=[row['latitud'], row['longitud']],
-                        radius=5,
-                        color='blue',
-                        fill=True,
-                        fill_color='blue',
-                        fill_opacity=0.7,
-                        popup=f"<b>{bank}</b><br>{row['nombre']}",
-                        tooltip=bank
+                        radius=0,  # Invisible
+                        opacity=0,
+                        fill_opacity=0
                     ).add_to(bank_group)
-                    
-                    # Create a circle to represent the isochrone
-                    # Only add isochrones for a subset of branches to improve performance
-                    if i % 3 == 0:  # Only add for every 3rd branch
-                        folium.Circle(
-                            location=[row['latitud'], row['longitud']],
-                            radius=radius_m,  # Use calculated radius in meters
-                            color='green' if transport_mode == "Walking" else 'orange',
-                            fill=True,
-                            fill_color='green' if transport_mode == "Walking" else 'orange',
-                            fill_opacity=0.1,
-                            weight=1,  # Thinner border for performance
-                            popup=f"{time_radius_min} min {transport_mode.lower()} distance"
-                        ).add_to(bank_group)
+            
+            # Add the marker layer LAST (will be at the top)
+            m.add_child(marker_group)
             
             # Add layer control to toggle banks
             folium.LayerControl().add_to(m)
@@ -2264,7 +2346,18 @@ def run_streamlit_ui():
             legend_html = f'''
                 <div style="position: fixed; bottom: 50px; left: 50px; z-index: 1000; background-color: white; padding: 10px; border: 1px solid grey; border-radius: 5px;">
                     <p><b>Legend:</b></p>
-                    <p><i class="fa fa-circle" style="color:blue"></i> Branch Location</p>
+                    <div style="max-height: 150px; overflow-y: auto;">
+            '''
+            
+            # Add bank colors to legend
+            banks_on_map = sorted(map_df['banco'].unique())
+            for bank in banks_on_map:
+                color = bank_color_map.get(bank, '#808080')  # Default to gray if not found
+                legend_html += f'<p><i class="fa fa-circle" style="color:{color}"></i> {bank}</p>'
+                
+            # Add the isochrone legend
+            legend_html += f'''
+                    </div>
                     <p><i class="fa fa-circle" style="color:{'green' if transport_mode == "Walking" else 'orange'}"></i> {time_radius_min} min {transport_mode} range ({radius_m/1000:.1f} km)</p>
                     <p><small>Use layer control (top right) to toggle banks</small></p>
                 </div>
