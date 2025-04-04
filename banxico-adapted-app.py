@@ -853,7 +853,7 @@ def run_streamlit_ui():
     st.markdown("<h2 class='sub-header'>Bank Market Distribution</h2>", unsafe_allow_html=True)
     
     # Set up tabs for different views of bank data
-    bank_tab1, bank_tab2, bank_tab3 = st.tabs(["📊 Bank Ranking", "🔍 Top Banks Analysis", "🔄 Compare Banks"])
+    bank_tab1, bank_tab2, bank_tab3, bank_tab4 = st.tabs(["📊 Bank Ranking", "🔍 Top Banks Analysis", "🔄 Compare Banks", "🏆 Competitive Analysis"])
     
     # -- Tab 1: Bank Ranking --
     with bank_tab1:
@@ -1303,6 +1303,338 @@ def run_streamlit_ui():
             
         else:
             st.info("Please select at least two banks to display the comparison.")
+    
+    # -- Tab 4: Competitive Analysis --
+    with bank_tab4:
+        st.markdown("<h3>Competitive Bank Analysis</h3>", unsafe_allow_html=True)
+        
+        # Allow selecting a central bank for comparison (default to Banamex if available)
+        all_banks = sorted(df['banco'].unique())
+        default_central_bank = "BANAMEX" if "BANAMEX" in all_banks else all_banks[0] if all_banks else None
+        
+        central_bank = st.selectbox(
+            "Select central bank for analysis:",
+            options=all_banks,
+            index=all_banks.index(default_central_bank) if default_central_bank in all_banks else 0
+        )
+        
+        # Create filter controls in columns
+        filter_col1, filter_col2 = st.columns([1, 1])
+        
+        with filter_col1:
+            # Create a list of all potential competitors (all banks except the central one)
+            all_competitors = [bank for bank in all_banks if bank != central_bank]
+            
+            # Option to select all competitors
+            use_all_competitors = st.checkbox("Compare against all competitors", value=True,
+                                             help="Check to compare against all competitors, uncheck to select specific competitors")
+            
+            if use_all_competitors:
+                competitor_banks = all_competitors
+                st.info(f"Comparing {central_bank} against all {len(all_competitors)} competitors")
+            else:
+                # Allow selecting specific competitor banks to compare against
+                competitor_banks = st.multiselect(
+                    "Select specific competitors to compare against:",
+                    options=all_competitors,
+                    default=all_competitors[:min(3, len(all_competitors))]
+                )
+        
+        with filter_col2:
+            # Add state filter
+            all_states = sorted(df['estado'].unique())
+            
+            # Option to filter by state
+            filter_by_state = st.checkbox("Filter by specific states", value=False,
+                                         help="Check to analyze only specific states")
+            
+            if filter_by_state:
+                selected_states = st.multiselect(
+                    "Select states to include in analysis:",
+                    options=all_states,
+                    default=all_states[:min(5, len(all_states))]
+                )
+            else:
+                selected_states = all_states
+        
+        if central_bank and competitor_banks:
+            # First apply state filtering to the entire dataset if needed
+            if filter_by_state and selected_states:
+                filtered_df = df[df['estado'].isin(selected_states)]
+                
+                # Show how many states are being filtered
+                if len(selected_states) < len(all_states):
+                    st.info(f"Analysis filtered to {len(selected_states)} states: {', '.join(selected_states[:3])}{' and others' if len(selected_states) > 3 else ''}")
+            else:
+                filtered_df = df
+            
+            # Then filter by banks
+            central_df = filtered_df[filtered_df['banco'] == central_bank]
+            competitors_df = filtered_df[filtered_df['banco'].isin(competitor_banks)]
+            comparison_df = pd.concat([central_df, competitors_df])
+            
+            # Calculate key metrics
+            total_branches = len(comparison_df)
+            central_branches = len(central_df)
+            total_states = comparison_df['estado'].nunique()
+            central_states = central_df['estado'].nunique()
+            
+            # Create metrics for overview
+            st.subheader(f"{central_bank} vs. Competitors: Key Metrics")
+            col1, col2, col3 = st.columns(3)
+            
+            competitors_text = "all competitors" if use_all_competitors else f"{len(competitor_banks)} selected competitors"
+            
+            with col1:
+                st.metric(
+                    f"{central_bank} Market Share", 
+                    f"{round(central_branches / total_branches * 100, 1)}%",
+                    help=f"Percentage of branches belonging to {central_bank} compared to {competitors_text}"
+                )
+            
+            with col2:
+                competitors_branches = len(competitors_df)
+                branch_delta = central_branches - (competitors_branches / len(competitor_banks))
+                delta_text = f"{branch_delta:+,.0f} vs. avg competitor"
+                
+                st.metric(
+                    f"Branch Count", 
+                    f"{central_branches:,}",
+                    delta=delta_text,
+                    help=f"Total number of {central_bank} branches compared to competitor average"
+                )
+            
+            with col3:
+                competitors_avg_states = sum(df[df['banco'] == bank]['estado'].nunique() for bank in competitor_banks) / len(competitor_banks)
+                state_delta = central_states - competitors_avg_states
+                delta_text = f"{state_delta:+,.1f} states vs. avg"
+                
+                st.metric(
+                    f"State Coverage", 
+                    f"{central_states}/{total_states} states",
+                    delta=delta_text,
+                    help=f"Number of states where {central_bank} has presence vs. the average competitor coverage"
+                )
+            
+            # --- Create comprehensive comparison table ---
+            st.subheader(f"{central_bank} vs. {competitors_text}: Detailed Comparison")
+            
+            # Calculate per-bank metrics
+            bank_metrics = []
+            
+            # Add central bank first
+            central_cities = central_df['ciudad'].nunique()
+            bank_metrics.append({
+                'Bank': central_bank,
+                'Branch Count': central_branches,
+                'Market Share (%)': round(central_branches / total_branches * 100, 1),
+                'States Covered': central_states,
+                'Cities Covered': central_cities,
+                'Branches per State': round(central_branches / central_states, 1) if central_states > 0 else 0,
+                'Branches per City': round(central_branches / central_cities, 1) if central_cities > 0 else 0,
+                'Type': 'Central Bank'
+            })
+            
+            # Add competitor banks
+            for bank in competitor_banks:
+                bank_df = df[df['banco'] == bank]
+                branch_count = len(bank_df)
+                state_count = bank_df['estado'].nunique()
+                city_count = bank_df['ciudad'].nunique()
+                
+                bank_metrics.append({
+                    'Bank': bank,
+                    'Branch Count': branch_count,
+                    'Market Share (%)': round(branch_count / total_branches * 100, 1),
+                    'States Covered': state_count,
+                    'Cities Covered': city_count,
+                    'Branches per State': round(branch_count / state_count, 1) if state_count > 0 else 0,
+                    'Branches per City': round(branch_count / city_count, 1) if city_count > 0 else 0,
+                    'Type': 'Competitor'
+                })
+            
+            # Convert to DataFrame and display
+            metrics_df = pd.DataFrame(bank_metrics)
+            st.dataframe(metrics_df.set_index('Bank'), use_container_width=True)
+            
+            # --- Geographic Distribution Comparison ---
+            st.subheader(f"{central_bank} vs. {competitors_text}: Geographic Comparison")
+            
+            # State-level comparison
+            # Calculate state-level branch counts for each bank using size() for robustness
+            state_pivot = comparison_df.pivot_table(
+                index='estado',
+                columns='banco',
+                aggfunc='size', # Use size instead of count('sucursal')
+                fill_value=0
+            ).reset_index()
+
+            # Add a total column - Check if state_pivot has non-'estado' columns before summing
+            numeric_cols = state_pivot.select_dtypes(include=np.number).columns
+            if not numeric_cols.empty:
+                state_pivot['Total'] = state_pivot[numeric_cols].sum(axis=1)
+            else:
+                state_pivot['Total'] = 0 # Handle case where pivot is empty or has no banks
+
+            # Calculate market share percentages for each bank by state
+            banks_in_pivot = [col for col in state_pivot.columns if col not in ['estado', 'Total']]
+            for bank in banks_in_pivot:
+                # Avoid division by zero if Total is 0
+                if state_pivot['Total'].sum() > 0: # Check if there's any total count > 0
+                    state_pivot[f'{bank} (%)'] = state_pivot.apply(lambda row: (row[bank] / row['Total'] * 100) if row['Total'] > 0 else 0, axis=1)
+                else:
+                    state_pivot[f'{bank} (%)'] = 0 # Set percentage to 0 if total is 0
+
+
+            # Sort by central bank presence (if central bank column exists)
+            if central_bank in state_pivot.columns:
+                state_pivot = state_pivot.sort_values(by=central_bank, ascending=False)
+            else:
+                # If central bank has no branches in selection, sort by Total or state name
+                 if 'Total' in state_pivot.columns:
+                      state_pivot = state_pivot.sort_values(by='Total', ascending=False)
+                 else: # Fallback if 'Total' somehow isn't there
+                     state_pivot = state_pivot.sort_values(by='estado')
+
+
+            # Create a heatmap
+            # Determine which banks and % columns actually exist in the pivot table
+            banks_to_show = [bank for bank in ([central_bank] + competitor_banks) if bank in state_pivot.columns]
+            percent_cols_to_show = [f'{bank} (%)' for bank in banks_to_show if f'{bank} (%)' in state_pivot.columns]
+
+            # Construct the list of columns for the heatmap data based on existing columns
+            # Select only the existing columns to avoid KeyError
+            heatmap_data_cols = ['estado'] + banks_to_show # Only need bank counts and state for heatmap source data
+            heatmap_data = state_pivot[[col for col in heatmap_data_cols if col in state_pivot.columns]].copy()
+
+
+            # Rename columns for better display - No longer needed as we only use bank columns for heatmap
+            # heatmap_data.columns = [ ... ]
+
+            # Create the heatmap using only the bank count columns
+            # Ensure 'estado' exists before setting index
+            if 'estado' in heatmap_data.columns:
+                 heatmap_pivot_data = heatmap_data.set_index('estado')
+                 # Ensure banks_to_show only contains columns actually present after filtering
+                 valid_banks_to_show = [bank for bank in banks_to_show if bank in heatmap_pivot_data.columns]
+
+                 if not heatmap_pivot_data.empty and valid_banks_to_show:
+                     fig_heatmap = px.imshow(
+                         heatmap_pivot_data[valid_banks_to_show], # Use the pivot data with only existing bank counts
+                         labels=dict(x="Bank", y="State", color="Branch Count"),
+                         x=valid_banks_to_show,
+                         color_continuous_scale="Viridis",
+                         title=f"Branch Distribution by State: {central_bank} vs {competitors_text}",
+                         aspect="auto"
+                     )
+                     fig_heatmap.update_layout(height=600)
+                     st.plotly_chart(fig_heatmap, use_container_width=True)
+                 else:
+                    st.warning("No data available to display the state distribution heatmap for the selected banks and states.")
+            else:
+                st.warning("Could not generate state distribution heatmap due to missing 'estado' column.")
+            
+            # --- Accessibility Analysis ---
+            st.subheader(f"{central_bank} vs. {competitors_text}: Accessibility Analysis")
+            
+            # Calculate overlap between central bank and competitors
+            central_cities_set = set(central_df['ciudad'].unique())
+            
+            overlap_data = []
+            for bank in competitor_banks:
+                bank_df = df[df['banco'] == bank]
+                bank_cities = set(bank_df['ciudad'].unique())
+                
+                # Calculate overlap
+                common_cities = central_cities_set.intersection(bank_cities)
+                only_central = central_cities_set - bank_cities
+                only_competitor = bank_cities - central_cities_set
+                
+                overlap_data.append({
+                    'Competitor': bank,
+                    'Cities with Both Banks': len(common_cities),
+                    f'Cities with only {central_bank}': len(only_central),
+                    f'Cities with only {bank}': len(only_competitor),
+                    'Overlap Percentage': round(len(common_cities) / len(central_cities_set.union(bank_cities)) * 100, 1)
+                })
+            
+            # Display overlap data
+            overlap_df = pd.DataFrame(overlap_data)
+            st.dataframe(overlap_df.set_index('Competitor'), use_container_width=True)
+            
+            # Visualize the top 10 states where central bank has advantage/disadvantage
+            st.subheader(f"{central_bank} Competitive Position by State")
+            
+            # Calculate advantage/disadvantage for central bank
+            advantage_data = []
+            
+            for state in state_pivot['estado'].unique():
+                state_row = state_pivot[state_pivot['estado'] == state].iloc[0]
+                central_share = state_row[f'{central_bank} (%)'] if f'{central_bank} (%)' in state_row else 0
+                
+                # Calculate the average competitor share
+                competitor_shares = [state_row[f'{bank} (%)'] for bank in competitor_banks 
+                                    if f'{bank} (%)' in state_row]
+                avg_competitor_share = sum(competitor_shares) / len(competitor_shares) if competitor_shares else 0
+                
+                # Calculate the advantage
+                advantage = central_share - avg_competitor_share
+                
+                advantage_data.append({
+                    'State': state,
+                    f'{central_bank} Share (%)': round(central_share, 1),
+                    'Avg Competitor Share (%)': round(avg_competitor_share, 1),
+                    'Advantage (pp)': round(advantage, 1)
+                })
+            
+            # Convert to DataFrame
+            advantage_df = pd.DataFrame(advantage_data)
+            
+            # Create two views - states with advantage and disadvantage
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown(f"#### Top States with {central_bank} Advantage")
+                top_advantage = advantage_df.sort_values(by='Advantage (pp)', ascending=False).head(10)
+                fig = px.bar(
+                    top_advantage,
+                    x='State',
+                    y='Advantage (pp)',
+                    color='Advantage (pp)',
+                    color_continuous_scale=[(0, "green"), (1, "darkgreen")],
+                    title=f"States where {central_bank} has the largest advantage",
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.markdown(f"#### Top States with {central_bank} Disadvantage")
+                top_disadvantage = advantage_df.sort_values(by='Advantage (pp)', ascending=True).head(10)
+                fig = px.bar(
+                    top_disadvantage,
+                    x='State',
+                    y='Advantage (pp)',
+                    color='Advantage (pp)',
+                    color_continuous_scale=[(0, "red"), (1, "darkred")],
+                    title=f"States where {central_bank} has the largest disadvantage",
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        elif not central_bank:
+            st.info("Please select a central bank to display the analysis.")
+        elif not competitor_banks:
+            st.info("Please select at least one competitor bank to display the analysis.")
+        elif central_df.empty:
+            if filter_by_state:
+                st.warning(f"{central_bank} has no branches in the selected states. Please adjust your state selection.")
+            else:
+                st.warning(f"No branch data found for {central_bank}. Please select a different bank.")
+        elif competitors_df.empty:
+            if filter_by_state:
+                st.warning(f"The selected competitors have no branches in the selected states. Please adjust your filters.")
+            else:
+                st.warning("No branch data found for the selected competitors. Please select different banks.")
             
     # Add informative expander about the analysis
     with st.expander("About Bank Distribution Analysis"):
@@ -1312,6 +1644,7 @@ def run_streamlit_ui():
         - **Bank Ranking**: Shows the relative size of bank branch networks
         - **Top Banks Analysis**: Provides deeper insights into the geographic spread and concentration of leading banks
         - **Bank Comparison**: Allows custom comparison of selected banks' branch networks and state presence
+        - **Competitive Analysis**: Provides detailed insights comparing a central bank (e.g., Banamex) against selected competitors, including market share, geographic distribution, and competitive positioning. Supports filtering by specific states and competitor banks.
         
         The analysis uses data from banxico_branches-complete.csv with proper data cleaning and normalization applied.
         """)
