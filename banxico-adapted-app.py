@@ -2989,6 +2989,18 @@ def run_streamlit_ui():
         st.markdown("<h3>Spatial Clustering Analysis</h3>", unsafe_allow_html=True)
         st.write("This analysis uses machine learning to identify natural clusters of banks based on geographic location.")
         
+        st.markdown("""
+        ### Understanding Bank Branch Distribution Patterns
+        
+        Spatial clustering reveals how banks strategically position their branches across Mexico. These patterns often reflect:
+        - Regional economic activities and population density
+        - Market competition and saturation levels
+        - Strategic decisions about territory coverage vs. urban concentration
+        - Historical bank expansion patterns and acquisition history
+        
+        Different clustering algorithms reveal different patterns in the data. Choose an algorithm below to explore different perspectives on bank branch distribution.
+        """)
+        
         # Add controls for clustering
         col1, col2 = st.columns(2)
         
@@ -3028,7 +3040,18 @@ def run_streamlit_ui():
                 eps = st.slider("DBSCAN Distance Parameter (eps)", 0.01, 0.5, 0.1)
                 min_samples = st.slider("DBSCAN Minimum Samples", 2, 20, 5)
                 
-                st.info("DBSCAN automatically identifies clusters based on density, making it effective for finding bank hotspots.")
+                st.info("""
+                **DBSCAN (Density-Based Spatial Clustering of Applications with Noise)**
+                
+                DBSCAN automatically identifies clusters based on density, making it effective for finding bank hotspots without specifying the number of clusters in advance. It excels at:
+                
+                - Discovering densely populated banking centers
+                - Identifying outlier branches (isolated locations)
+                - Finding irregularly shaped banking corridors or regions
+                - Detecting natural market boundaries
+                
+                *Analysis insight: Dense clusters often indicate competitive urban centers, while outliers represent strategic rural presence or first-mover advantage in emerging markets.*
+                """)
                 
                 clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(coords_scaled)
                 cluster_df['cluster'] = clustering.labels_
@@ -3037,14 +3060,36 @@ def run_streamlit_ui():
                 
             elif clustering_type == "K-Means":
                 from sklearn.cluster import KMeans
-                st.info("K-Means divides banks into a specified number of clusters based on location.")
+                st.info("""
+                **K-Means Clustering**
+                
+                K-Means divides banks into a specified number of clusters based on location, creating regions of equal spatial variance. It's particularly effective for:
+                
+                - Partitioning banking service territories
+                - Identifying geographic centers of banking concentration
+                - Creating balanced regional distribution maps
+                - Analyzing market segmentation by geography
+                
+                *Analysis insight: K-Means clusters often align with major metropolitan areas and their surrounding regions. Cluster centers typically reveal the economic gravity centers of regions, while cluster sizes indicate market spread strategies.*
+                """)
                 
                 clustering = KMeans(n_clusters=num_clusters, random_state=42).fit(coords_scaled)
                 cluster_df['cluster'] = clustering.labels_
                 
             elif clustering_type == "Hierarchical":
                 from sklearn.cluster import AgglomerativeClustering
-                st.info("Hierarchical clustering builds clusters by progressively merging or splitting branches based on distance.")
+                st.info("""
+                **Hierarchical Clustering**
+                
+                Hierarchical clustering builds a tree of clusters by progressively merging or splitting branches based on distance. This approach excels at:
+                
+                - Identifying multi-level market hierarchies (national → regional → local)
+                - Revealing relationships between banking subgroups
+                - Finding natural groupings at different geographic scales
+                - Detecting market adjacencies and banking corridors
+                
+                *Analysis insight: The hierarchy of clusters often mirrors Mexico's economic development patterns, with primary clusters in major cities, secondary clusters in regional centers, and tertiary clusters in emerging markets. Distance thresholds reveal natural market boundaries based on geography and transportation infrastructure.*
+                """)
                 
                 distance_threshold = st.slider("Distance Threshold", 0.1, 5.0, 1.0)
                 linkage = st.selectbox("Linkage Type", ["ward", "complete", "average", "single"], index=0)
@@ -3087,6 +3132,17 @@ def run_streamlit_ui():
             # Analyze cluster characteristics
             st.subheader("Cluster Characteristics")
             
+            st.markdown("""
+            The table below provides key metrics for each identified cluster. These metrics reveal important insights about bank distribution strategies:
+            
+            - **Branch Count**: The number of branches in each cluster indicates market investment levels
+            - **Cities Count**: How many unique municipalities are covered by the cluster
+            - **States Count**: Geographic spread across administrative boundaries
+            - **Average Distance**: The average distance (in km) of branches from the cluster center, indicating cluster density
+            
+            *Analysis insight: Compact clusters (low avg distance) often represent concentrated urban markets with high competition, while dispersed clusters (high avg distance) typically indicate regional service networks spanning multiple population centers. Multi-state clusters may reveal strategic corridors or economic regions that transcend administrative boundaries.*
+            """)
+            
             # Group by cluster
             cluster_analysis = cluster_df.groupby('cluster').agg({
                 'banco': 'count',
@@ -3121,6 +3177,18 @@ def run_streamlit_ui():
                 from sklearn.metrics import silhouette_score
                 try:
                     silhouette_avg = silhouette_score(coords_scaled, cluster_df['cluster'])
+                    
+                    st.markdown("""
+                    ### Clustering Quality Assessment
+                    
+                    The silhouette score measures how well-separated the clusters are. Values range from -1 to 1:
+                    - Scores near 1 indicate compact, well-separated clusters
+                    - Scores near 0 indicate overlapping clusters
+                    - Negative scores indicate branches may be assigned to the wrong clusters
+                    
+                    *Analysis insight: Higher silhouette scores often indicate natural market territories with clear geographic boundaries, while lower scores suggest more continuous market coverage with gradual transitions between regions. Banking markets rarely show perfect separation due to the strategic placement of branches along transportation corridors and in transition zones between urban centers.*
+                    """)
+                    
                     st.metric("Clustering Quality (Silhouette Score)", f"{silhouette_avg:.3f}", 
                               help="Ranges from -1 to 1. Higher values indicate better defined clusters.")
                 except:
@@ -3128,6 +3196,15 @@ def run_streamlit_ui():
             
             # Bank composition by cluster
             st.subheader("Bank Composition by Cluster")
+            
+            st.markdown("""
+            This section reveals the competitive landscape within each cluster, showing which banks dominate in specific geographic areas.
+            
+            *Analysis insight: Cluster composition often reveals different market strategies - some clusters may be dominated by a single bank showing territorial focus, while others show balanced competition among multiple institutions. Urban clusters typically have more diverse bank presence, while specialized regional clusters may be dominated by banks with specific market focuses (e.g., agricultural, industrial, or tourism-focused institutions).*
+            
+            Select a cluster below to analyze its bank composition:
+            """)
+            
             bank_cluster = cluster_df.groupby(['cluster', 'banco']).size().reset_index(name='count')
             
             # Pivot to get banks as columns
