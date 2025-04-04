@@ -634,6 +634,9 @@ def find_underserved_areas_by_density(df):
 
 # --- Main Application Layout ---
 def run_streamlit_ui():
+    # Make sure numpy is available in this function scope
+    import numpy as np
+    
     # Load data
     raw_df = load_data() # Load the original, unfiltered data first
     if raw_df.empty:
@@ -1470,6 +1473,7 @@ def run_streamlit_ui():
             ).reset_index()
 
             # Add a total column - Check if state_pivot has non-'estado' columns before summing
+            import numpy as np  # Import numpy locally for this function
             numeric_cols = state_pivot.select_dtypes(include=np.number).columns
             if not numeric_cols.empty:
                 state_pivot['Total'] = state_pivot[numeric_cols].sum(axis=1)
@@ -2875,7 +2879,855 @@ def run_streamlit_ui():
                 """)
 
     st.markdown("--- ")
-
+    
+    # ----- EXPLORATORY ANALYSIS SECTION -----
+    st.markdown("<h1 class='main-header'>🔬 Advanced Exploratory Analysis</h1>", unsafe_allow_html=True)
+    
+    # Create tabs for different types of exploratory analysis
+    explore_tab1, explore_tab2, explore_tab3, explore_tab4 = st.tabs([
+        "🔍 Municipality Analysis", 
+        "📊 Spatial Clustering", 
+        "🧮 Predictive Modeling",
+        "🌐 Network Analysis"
+    ])
+    
+    # Tab 1: Municipality-Level Analysis
+    with explore_tab1:
+        st.markdown("<h3>Municipality-Level Banking Presence</h3>", unsafe_allow_html=True)
+        st.write("This analysis examines banking presence at the municipality level, revealing underserved areas.")
+        
+        # Aggregate data by municipality
+        municipality_df = df.groupby(['estado', 'ciudad']).agg({
+            'banco': pd.Series.nunique,
+            'sucursal': 'count',
+            'latitud': 'first',
+            'longitud': 'first'
+        }).reset_index()
+        
+        municipality_df.columns = ['State', 'Municipality', 'Unique Banks', 'Branch Count', 'Latitude', 'Longitude']
+        
+        # Calculate banking presence score
+        municipality_df['Banking Presence Score'] = municipality_df['Unique Banks'] * municipality_df['Branch Count']
+        municipality_df['Banking Diversity'] = municipality_df['Unique Banks'] / municipality_df['Branch Count']
+        municipality_df['Banking Diversity'] = municipality_df['Banking Diversity'].fillna(0)
+        
+        # Filter options
+        col1, col2 = st.columns(2)
+        with col1:
+            min_banks = st.slider("Minimum number of unique banks", 1, 10, 1)
+            municipality_df_filtered = municipality_df[municipality_df['Unique Banks'] >= min_banks]
+        
+        with col2:
+            sort_by = st.selectbox(
+                "Sort by",
+                options=['Branch Count', 'Unique Banks', 'Banking Presence Score', 'Banking Diversity'],
+                index=2
+            )
+        
+        # Show top municipalities by selected metric
+        st.subheader(f"Top Municipalities by {sort_by}")
+        top_municipalities = municipality_df_filtered.sort_values(by=sort_by, ascending=False).head(15)
+        st.dataframe(top_municipalities, use_container_width=True)
+        
+        # Create a map of municipalities colored by banking presence
+        st.subheader("Municipal Banking Presence Map")
+        
+        fig = px.scatter_mapbox(
+            municipality_df,
+            lat="Latitude",
+            lon="Longitude",
+            color="Banking Presence Score",
+            size="Branch Count",
+            hover_name="Municipality",
+            hover_data=["State", "Unique Banks", "Branch Count"],
+            color_continuous_scale="Viridis",
+            size_max=25,
+            zoom=4.5,
+            center={"lat": 23.6345, "lon": -102.5528},
+            title="Municipality-Level Banking Presence",
+            mapbox_style="carto-positron"
+        )
+        fig.update_layout(
+            height=600
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"scrollZoom": True})
+        
+        # Banking deserts analysis
+        st.subheader("Banking Deserts Analysis")
+        
+        # Find municipalities with only one bank
+        banking_deserts = municipality_df[municipality_df['Unique Banks'] == 1]
+        st.write(f"Found {len(banking_deserts)} municipalities with only one bank present (banking monopolies).")
+        
+        # Show the top 10 banking deserts
+        if not banking_deserts.empty:
+            st.dataframe(banking_deserts.sort_values('Branch Count', ascending=False).head(10), use_container_width=True)
+            
+            # Banking desert map
+            fig_desert = px.scatter_mapbox(
+                banking_deserts,
+                lat="Latitude",
+                lon="Longitude",
+                color="Branch Count",
+                size="Branch Count",
+                hover_name="Municipality",
+                hover_data=["State", "Banking Presence Score"],
+                color_continuous_scale="Reds",
+                size_max=15,
+                zoom=4,
+                center={"lat": 23.6345, "lon": -102.5528},
+                title="Banking Monopolies (Municipalities with Only One Bank)",
+                mapbox_style="carto-positron"
+            )
+            fig_desert.update_layout(
+                height=500
+            )
+            st.plotly_chart(fig_desert, use_container_width=True, config={"scrollZoom": True})
+    
+    # Tab 2: Spatial Clustering
+    with explore_tab2:
+        st.markdown("<h3>Spatial Clustering Analysis</h3>", unsafe_allow_html=True)
+        st.write("This analysis uses machine learning to identify natural clusters of banks based on geographic location.")
+        
+        # Add controls for clustering
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            clustering_type = st.selectbox(
+                "Clustering Algorithm",
+                options=["DBSCAN", "K-Means", "Hierarchical"],
+                index=0
+            )
+        
+        with col2:
+            num_clusters = st.slider("Number of Clusters (for K-Means)", 2, 20, 5)
+        
+        # Filter for specific banks if interested
+        cluster_bank = st.selectbox(
+            "Select bank to focus on (optional)",
+            options=["All Banks"] + sorted(df['banco'].unique().tolist()),
+            index=0
+        )
+        
+        # Create a clustering dataset with coordinates
+        if cluster_bank == "All Banks":
+            cluster_df = df[['latitud', 'longitud', 'banco', 'ciudad', 'estado']].copy()
+        else:
+            cluster_df = df[df['banco'] == cluster_bank][['latitud', 'longitud', 'banco', 'ciudad', 'estado']].copy()
+        
+        if not cluster_df.empty:
+            # Normalize coordinates for better clustering
+            from sklearn.preprocessing import StandardScaler
+            coords = cluster_df[['latitud', 'longitud']].values
+            coords_scaled = StandardScaler().fit_transform(coords)
+            
+            # Perform clustering based on user selection
+            if clustering_type == "DBSCAN":
+                from sklearn.cluster import DBSCAN
+                # DBSCAN automatically determines the number of clusters
+                eps = st.slider("DBSCAN Distance Parameter (eps)", 0.01, 0.5, 0.1)
+                min_samples = st.slider("DBSCAN Minimum Samples", 2, 20, 5)
+                
+                st.info("DBSCAN automatically identifies clusters based on density, making it effective for finding bank hotspots.")
+                
+                clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(coords_scaled)
+                cluster_df['cluster'] = clustering.labels_
+                num_clusters_actual = len(set(clustering.labels_)) - (1 if -1 in clustering.labels_ else 0)
+                st.write(f"DBSCAN identified {num_clusters_actual} clusters and {list(clustering.labels_).count(-1)} outliers.")
+                
+            elif clustering_type == "K-Means":
+                from sklearn.cluster import KMeans
+                st.info("K-Means divides banks into a specified number of clusters based on location.")
+                
+                clustering = KMeans(n_clusters=num_clusters, random_state=42).fit(coords_scaled)
+                cluster_df['cluster'] = clustering.labels_
+                
+            elif clustering_type == "Hierarchical":
+                from sklearn.cluster import AgglomerativeClustering
+                st.info("Hierarchical clustering builds clusters by progressively merging or splitting branches based on distance.")
+                
+                distance_threshold = st.slider("Distance Threshold", 0.1, 5.0, 1.0)
+                linkage = st.selectbox("Linkage Type", ["ward", "complete", "average", "single"], index=0)
+                
+                clustering = AgglomerativeClustering(
+                    n_clusters=None, 
+                    distance_threshold=distance_threshold,
+                    linkage=linkage
+                ).fit(coords_scaled)
+                cluster_df['cluster'] = clustering.labels_
+                st.write(f"Hierarchical clustering identified {len(set(clustering.labels_))} clusters.")
+            
+            # Plot the clusters on a map
+            st.subheader("Spatial Clustering Results")
+            
+            # Convert cluster labels to strings for better coloring
+            cluster_df['cluster_str'] = cluster_df['cluster'].astype(str)
+            
+            # Create a color map for the clusters
+            cluster_colors = px.colors.qualitative.Plotly + px.colors.qualitative.Vivid
+            
+            fig = px.scatter_mapbox(
+                cluster_df,
+                lat="latitud",
+                lon="longitud",
+                color="cluster_str",
+                hover_name="banco",
+                hover_data=["ciudad", "estado"],
+                color_discrete_sequence=cluster_colors,
+                zoom=4.5,
+                center={"lat": 23.6345, "lon": -102.5528},
+                title=f"Spatial Clusters of {cluster_bank if cluster_bank != 'All Banks' else 'Banks'} using {clustering_type}",
+                mapbox_style="carto-positron"
+            )
+            fig.update_layout(
+                height=600
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"scrollZoom": True})
+            
+            # Analyze cluster characteristics
+            st.subheader("Cluster Characteristics")
+            
+            # Group by cluster
+            cluster_analysis = cluster_df.groupby('cluster').agg({
+                'banco': 'count',
+                'ciudad': pd.Series.nunique,
+                'estado': pd.Series.nunique
+            }).reset_index()
+            
+            cluster_analysis.columns = ['Cluster', 'Branch Count', 'Cities Count', 'States Count']
+            
+            # Calculate the average distance from cluster center
+            from scipy.spatial.distance import cdist
+            import numpy as np
+            
+            cluster_centers = {}
+            for cluster_id in set(cluster_df['cluster']):
+                if cluster_id == -1:  # Skip noise points in DBSCAN
+                    continue
+                cluster_points = cluster_df[cluster_df['cluster'] == cluster_id][['latitud', 'longitud']].values
+                cluster_center = np.mean(cluster_points, axis=0)
+                cluster_centers[cluster_id] = cluster_center
+                
+                # Calculate average distance to center
+                distances = cdist([cluster_center], cluster_points)[0]
+                avg_distance = np.mean(distances)
+                cluster_analysis.loc[cluster_analysis['Cluster'] == cluster_id, 'Avg Distance (km)'] = avg_distance * 111  # Approximate conversion from degrees to km
+            
+            # Display the cluster analysis
+            st.dataframe(cluster_analysis.sort_values('Branch Count', ascending=False), use_container_width=True)
+            
+            # Calculate silhouette score if applicable
+            if clustering_type != "DBSCAN" and len(set(cluster_df['cluster'])) > 1:
+                from sklearn.metrics import silhouette_score
+                try:
+                    silhouette_avg = silhouette_score(coords_scaled, cluster_df['cluster'])
+                    st.metric("Clustering Quality (Silhouette Score)", f"{silhouette_avg:.3f}", 
+                              help="Ranges from -1 to 1. Higher values indicate better defined clusters.")
+                except:
+                    st.write("Could not calculate silhouette score.")
+            
+            # Bank composition by cluster
+            st.subheader("Bank Composition by Cluster")
+            bank_cluster = cluster_df.groupby(['cluster', 'banco']).size().reset_index(name='count')
+            
+            # Pivot to get banks as columns
+            bank_composition = bank_cluster.pivot_table(
+                index='cluster', 
+                columns='banco', 
+                values='count',
+                fill_value=0
+            ).reset_index()
+            
+            # Plot bank composition by cluster
+            selected_cluster = st.selectbox(
+                "Select cluster to analyze:",
+                options=sorted(cluster_df['cluster'].unique()),
+                index=0
+            )
+            
+            cluster_banks = cluster_df[cluster_df['cluster'] == selected_cluster]['banco'].value_counts().reset_index()
+            cluster_banks.columns = ['Bank', 'Branch Count']
+            
+            fig = px.bar(
+                cluster_banks,
+                x='Bank',
+                y='Branch Count',
+                title=f"Bank Composition in Cluster {selected_cluster}",
+                color='Bank',
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Tab 3: Predictive Modeling
+    with explore_tab3:
+        st.markdown("<h3>Predictive Banking Presence Model</h3>", unsafe_allow_html=True)
+        st.write("This analysis builds a machine learning model to predict banking presence based on demographic factors.")
+        
+        # Create dataset for modeling
+        state_df = pd.DataFrame(list(STATE_DATA.items()), columns=['State', 'Data'])
+        model_df = pd.DataFrame([{
+            'State': state,
+            'Population': data['population'],
+            'Adult_Population_Pct': data['adult_population_pct'],
+            'Area_km2': data['area_km2'],
+            'Urbanization_Pct': data['urban_pct'],
+            'GDP_per_Capita': data['gdp_per_capita']
+        } for state, data in STATE_DATA.items()])
+        
+        # Add banking metrics
+        state_branches = df.groupby('estado').size().reset_index(name='Branch_Count')
+        state_branches.columns = ['State', 'Branch_Count']
+        
+        # Merge data
+        model_df = model_df.merge(state_branches, on='State', how='left')
+        model_df['Branch_Count'] = model_df['Branch_Count'].fillna(0)
+        
+        # Add derived metrics
+        model_df['Branches_per_100k'] = (model_df['Branch_Count'] / model_df['Population']) * 100000
+        model_df['Branches_per_1000km2'] = (model_df['Branch_Count'] / model_df['Area_km2']) * 1000
+        
+        # Target selection
+        target_col = st.selectbox(
+            "Select target variable to predict:",
+            options=['Branches_per_100k', 'Branches_per_1000km2', 'Branch_Count'],
+            index=0
+        )
+        
+        # Feature selection
+        feature_cols = st.multiselect(
+            "Select features for the model:",
+            options=['Population', 'Adult_Population_Pct', 'Area_km2', 'Urbanization_Pct', 'GDP_per_Capita'],
+            default=['Population', 'Urbanization_Pct', 'GDP_per_Capita']
+        )
+        
+        if feature_cols:
+            from sklearn.model_selection import train_test_split
+            from sklearn.linear_model import LinearRegression
+            from sklearn.ensemble import RandomForestRegressor
+            from sklearn.metrics import mean_squared_error, r2_score
+            import numpy as np
+            
+            # Remove rows with NaN values
+            model_data = model_df.dropna(subset=feature_cols + [target_col])
+            
+            # Train-test split
+            X = model_data[feature_cols]
+            y = model_data[target_col]
+            
+            # Display correlation heatmap
+            st.subheader("Feature Correlation Analysis")
+            corr_matrix = model_data[feature_cols + [target_col]].corr()
+            
+            fig_heatmap = px.imshow(
+                corr_matrix,
+                text_auto=True,
+                color_continuous_scale="RdBu_r",
+                title="Correlation Heatmap",
+                aspect="auto",
+                zmin=-1, zmax=1
+            )
+            st.plotly_chart(fig_heatmap, use_container_width=True)
+            
+            # Select model type
+            model_type = st.selectbox(
+                "Select model type:",
+                options=["Linear Regression", "Random Forest"],
+                index=0
+            )
+            
+            if len(model_data) > 5:  # Ensure enough data points
+                if model_type == "Linear Regression":
+                    model = LinearRegression()
+                else:
+                    model = RandomForestRegressor(n_estimators=100, random_state=42)
+                
+                # Train on all data
+                model.fit(X, y)
+                y_pred = model.predict(X)
+                
+                # Model performance
+                mse = mean_squared_error(y, y_pred)
+                r2 = r2_score(y, y_pred)
+                
+                st.subheader("Model Performance")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Mean Squared Error", f"{mse:.4f}")
+                with col2:
+                    st.metric("R² Score", f"{r2:.4f}", help="Closer to 1 is better. Indicates how well the model explains the variation in data.")
+                
+                # Feature importance
+                st.subheader("Feature Importance")
+                if model_type == "Linear Regression":
+                    importance = model.coef_
+                    importance_df = pd.DataFrame({'Feature': feature_cols, 'Importance': importance})
+                    importance_df['Absolute Importance'] = abs(importance_df['Importance'])
+                    importance_df = importance_df.sort_values('Absolute Importance', ascending=False)
+                else:
+                    importance = model.feature_importances_
+                    importance_df = pd.DataFrame({'Feature': feature_cols, 'Importance': importance})
+                    importance_df = importance_df.sort_values('Importance', ascending=False)
+                
+                fig = px.bar(
+                    importance_df,
+                    x='Feature',
+                    y='Importance',
+                    title="Feature Importance",
+                    color='Importance',
+                    color_continuous_scale='RdBu_r'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Predicted vs Actual
+                st.subheader("Predicted vs Actual Values")
+                results_df = pd.DataFrame({
+                    'State': model_data['State'],
+                    'Actual': y,
+                    'Predicted': y_pred,
+                    'Error': y - y_pred
+                })
+                
+                # Check if statsmodels is available
+                has_statsmodels = False
+                try:
+                    import statsmodels.api as sm
+                    has_statsmodels = True
+                except ImportError:
+                    pass
+                
+                # Create scatter plot with conditional trendline
+                fig = px.scatter(
+                    results_df,
+                    x='Actual',
+                    y='Predicted',
+                    hover_name='State',
+                    hover_data=['Error'],
+                    trendline='ols' if has_statsmodels else None,
+                    title=f"Actual vs Predicted {target_col}",
+                )
+                fig.add_shape(
+                    type='line',
+                    x0=min(y), y0=min(y),
+                    x1=max(y), y1=max(y),
+                    line=dict(color='red', dash='dash')
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # States with highest errors
+                st.subheader("States with Highest Prediction Errors")
+                results_df['Absolute Error'] = abs(results_df['Error'])
+                results_df = results_df.sort_values('Absolute Error', ascending=False)
+                st.dataframe(results_df, use_container_width=True)
+                
+                # Banking potential analysis
+                st.subheader("Banking Potential Analysis")
+                st.write("States with high positive errors have fewer branches than predicted, suggesting market potential.")
+                
+                # Find states with high positive errors (underbranched)
+                underbranched = results_df[results_df['Error'] > 0].sort_values('Error', ascending=False)
+                if not underbranched.empty:
+                    st.write("States that appear to be underbranched (fewer branches than expected):")
+                    st.dataframe(underbranched, use_container_width=True)
+                    
+                    # Create map of underbranched states
+                    underbranched_map = model_df.merge(underbranched[['State', 'Error']], on='State', how='inner')
+                    
+                    # Get state coordinates for mapping
+                    state_coords = {}
+                    for state in underbranched_map['State']:
+                        state_branches = df[df['estado'] == state]
+                        if not state_branches.empty:
+                            state_coords[state] = {
+                                'lat': state_branches['latitud'].mean(),
+                                'lon': state_branches['longitud'].mean()
+                            }
+                    
+                    # Add coordinates to dataframe
+                    underbranched_map['Latitude'] = underbranched_map['State'].map(lambda x: state_coords.get(x, {}).get('lat'))
+                    underbranched_map['Longitude'] = underbranched_map['State'].map(lambda x: state_coords.get(x, {}).get('lon'))
+                    
+                    # Filter out states without coordinates
+                    underbranched_map = underbranched_map.dropna(subset=['Latitude', 'Longitude'])
+                    
+                    if not underbranched_map.empty:
+                        fig = px.scatter_mapbox(
+                            underbranched_map,
+                            lat="Latitude",
+                            lon="Longitude",
+                            color="Error",
+                            size="Error",
+                            hover_name="State",
+                            hover_data=["Branch_Count", "Branches_per_100k"],
+                            color_continuous_scale="Reds",
+                            size_max=25,
+                            zoom=4.5,
+                            center={"lat": 23.6345, "lon": -102.5528},
+                            title="States with Banking Expansion Potential",
+                            mapbox_style="carto-positron"
+                        )
+                        fig.update_layout(
+                            height=600
+                        )
+                        st.plotly_chart(fig, use_container_width=True, config={"scrollZoom": True})
+            else:
+                st.warning("Not enough data points for modeling. Need at least 6 states with complete data.")
+        else:
+            st.warning("Please select at least one feature for the model.")
+    
+    # Tab 4: Network Analysis
+    with explore_tab4:
+        st.markdown("<h3>Banking Network Analysis</h3>", unsafe_allow_html=True)
+        st.write("This analysis examines the relationships between banks, states, and cities using network analysis techniques.")
+        
+        # Create NetworkX graph
+        import networkx as nx
+        from pyvis.network import Network
+        import tempfile
+        
+        network_type = st.selectbox(
+            "Select network relationship to analyze:",
+            options=["Bank-State Network", "Bank-City Network", "State Connectivity Network"],
+            index=0
+        )
+        
+        if network_type == "Bank-State Network":
+            # Create a bank-state bipartite graph
+            st.info("This network shows which banks operate in which states. Banks are connected to the states where they have branches.")
+            
+            # Get bank-state relationships
+            bank_state_df = df.groupby(['banco', 'estado']).size().reset_index(name='branch_count')
+            
+            # Create graph
+            G = nx.Graph()
+            
+            # Add bank nodes
+            for bank in bank_state_df['banco'].unique():
+                G.add_node(bank, type='bank', group=1)
+            
+            # Add state nodes
+            for state in bank_state_df['estado'].unique():
+                G.add_node(state, type='state', group=2)
+            
+            # Add edges
+            for _, row in bank_state_df.iterrows():
+                G.add_edge(row['banco'], row['estado'], weight=row['branch_count'])
+            
+            # Network metrics
+            st.subheader("Network Metrics")
+            centrality = nx.degree_centrality(G)
+            bank_centrality = {node: cent for node, cent in centrality.items() if node in df['banco'].unique()}
+            
+            # Most central banks (those with presence in most states)
+            top_banks = sorted(bank_centrality.items(), key=lambda x: x[1], reverse=True)[:10]
+            
+            st.write("Banks with the highest state presence (degree centrality):")
+            bank_central_df = pd.DataFrame(top_banks, columns=['Bank', 'Centrality Score'])
+            bank_central_df['States Present'] = bank_central_df['Bank'].apply(
+                lambda x: len(bank_state_df[bank_state_df['banco'] == x]['estado'].unique())
+            )
+            st.dataframe(bank_central_df, use_container_width=True)
+            
+            # Minimum cutoff for visualization
+            min_branches = st.slider(
+                "Minimum branches for visualization", 
+                min_value=1,
+                max_value=int(bank_state_df['branch_count'].max()),
+                value=5
+            )
+            
+            # Filter edges for visualization
+            filtered_edges = bank_state_df[bank_state_df['branch_count'] >= min_branches]
+            
+            # Create new graph for visualization
+            G_vis = nx.Graph()
+            
+            # Add nodes and edges
+            for _, row in filtered_edges.iterrows():
+                if row['banco'] not in G_vis.nodes():
+                    G_vis.add_node(row['banco'], title=row['banco'], group=1, size=15)
+                
+                if row['estado'] not in G_vis.nodes():
+                    G_vis.add_node(row['estado'], title=row['estado'], group=2, size=20)
+                
+                G_vis.add_edge(
+                    row['banco'], 
+                    row['estado'], 
+                    value=row['branch_count'], 
+                    title=f"{row['branch_count']} branches"
+                )
+            
+            # Visualize
+            nt = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black")
+            nt.from_nx(G_vis)
+            nt.set_options("""
+            var options = {
+                "nodes": {
+                    "borderWidth": 2,
+                    "borderWidthSelected": 4,
+                    "font": {"size": 12}
+                },
+                "edges": {
+                    "color": {
+                        "inherit": true
+                    },
+                    "smooth": {
+                        "type": "continuous",
+                        "forceDirection": "none"
+                    }
+                },
+                "physics": {
+                    "enabled": false,
+                    "stabilization": {
+                        "enabled": true,
+                        "iterations": 2000,
+                        "updateInterval": 1
+                    }
+                }
+            }
+            """)
+            
+            # Save and display
+            with tempfile.NamedTemporaryFile(suffix='.html') as fp:
+                nt.save_graph(fp.name)
+                with open(fp.name, 'r', encoding='utf-8') as f:
+                    html = f.read()
+            
+            st.components.v1.html(html, height=600)
+            
+        elif network_type == "Bank-City Network":
+            st.info("This network visualizes which banks have a significant presence in different cities.")
+            
+            # Filter for municipalities with multiple banks for better visualization
+            city_bank_df = df.groupby(['ciudad', 'banco']).size().reset_index(name='branch_count')
+            
+            # Count unique banks per city
+            city_bank_counts = city_bank_df.groupby('ciudad')['banco'].nunique().reset_index()
+            city_bank_counts.columns = ['ciudad', 'bank_count']
+            
+            # Filter cities with at least N banks
+            min_banks = st.slider("Minimum number of banks in city", 2, 10, 4)
+            filtered_cities = city_bank_counts[city_bank_counts['bank_count'] >= min_banks]['ciudad'].tolist()
+            
+            # Filter the data
+            filtered_df = city_bank_df[city_bank_df['ciudad'].isin(filtered_cities)]
+            
+            # Minimum branches per bank in each city
+            min_branches = st.slider("Minimum branches per bank in city", 1, 10, 2)
+            filtered_df = filtered_df[filtered_df['branch_count'] >= min_branches]
+            
+            if not filtered_df.empty:
+                # Create network
+                G = nx.Graph()
+                
+                # Add bank nodes with bank group
+                for bank in filtered_df['banco'].unique():
+                    G.add_node(bank, title=bank, group=1, size=20)
+                
+                # Add city nodes with city group
+                for city in filtered_df['ciudad'].unique():
+                    G.add_node(city, title=city, group=2, size=15)
+                
+                # Add edges
+                for _, row in filtered_df.iterrows():
+                    G.add_edge(
+                        row['banco'], 
+                        row['ciudad'], 
+                        value=row['branch_count'],
+                        title=f"{row['branch_count']} branches"
+                    )
+                
+                # Create network visualization
+                nt = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black")
+                nt.from_nx(G)
+                nt.set_options("""
+                var options = {
+                    "nodes": {
+                        "borderWidth": 2,
+                        "borderWidthSelected": 4,
+                        "font": {"size": 12}
+                    },
+                    "edges": {
+                        "color": {
+                            "inherit": true
+                        },
+                        "smooth": {
+                            "type": "continuous",
+                            "forceDirection": "none"
+                        }
+                    },
+                    "physics": {
+                        "enabled": false,
+                        "stabilization": {
+                            "enabled": true,
+                            "iterations": 2000,
+                            "updateInterval": 1
+                        }
+                    }
+                }
+                """)
+                
+                # Save and display
+                with tempfile.NamedTemporaryFile(suffix='.html') as fp:
+                    nt.save_graph(fp.name)
+                    with open(fp.name, 'r', encoding='utf-8') as f:
+                        html = f.read()
+                
+                st.components.v1.html(html, height=600)
+                
+                # Network metrics
+                st.subheader("Network Insights")
+                
+                # Banks with the highest city coverage
+                bank_city_coverage = filtered_df.groupby('banco')['ciudad'].nunique().reset_index()
+                bank_city_coverage.columns = ['Bank', 'Cities Covered']
+                bank_city_coverage = bank_city_coverage.sort_values('Cities Covered', ascending=False)
+                
+                st.write("Banks with the most city coverage in this network:")
+                st.dataframe(bank_city_coverage.head(10), use_container_width=True)
+                
+                # Cities with the most bank presence
+                city_bank_coverage = filtered_df.groupby('ciudad')['banco'].nunique().reset_index()
+                city_bank_coverage.columns = ['City', 'Banks Present']
+                city_bank_coverage = city_bank_coverage.sort_values('Banks Present', ascending=False)
+                
+                st.write("Cities with the most banks present:")
+                st.dataframe(city_bank_coverage.head(10), use_container_width=True)
+            else:
+                st.warning("No data matching the current filters. Try adjusting the minimum values.")
+            
+        elif network_type == "State Connectivity Network":
+            st.info("This network shows how states are connected by common banks operating in them.")
+            
+            # Get banks by state
+            bank_state_df = df.groupby(['banco', 'estado']).size().reset_index(name='branch_count')
+            
+            # Create state-state matrix (states connected if they have common banks)
+            states = sorted(bank_state_df['estado'].unique())
+            state_connections = pd.DataFrame(0, index=states, columns=states)
+            
+            # For each bank, add connections between all states it operates in
+            for bank in bank_state_df['banco'].unique():
+                bank_states = bank_state_df[bank_state_df['banco'] == bank]['estado'].tolist()
+                for i in range(len(bank_states)):
+                    for j in range(i+1, len(bank_states)):
+                        state_connections.loc[bank_states[i], bank_states[j]] += 1
+                        state_connections.loc[bank_states[j], bank_states[i]] += 1
+            
+            # Threshold for connections
+            min_common_banks = st.slider("Minimum common banks between states", 1, 
+                                        int(state_connections.max().max()), 
+                                        value=min(3, int(state_connections.max().max())))
+            
+            # Create network
+            G = nx.Graph()
+            
+            # Add state nodes
+            for state in states:
+                G.add_node(state, title=state, group=1, size=15)
+            
+            # Add edges for states with common banks above threshold
+            for i in range(len(states)):
+                for j in range(i+1, len(states)):
+                    if state_connections.iloc[i, j] >= min_common_banks:
+                        G.add_edge(
+                            states[i], states[j], 
+                            value=state_connections.iloc[i, j],
+                            title=f"{state_connections.iloc[i, j]} common banks"
+                        )
+            
+            # Network metrics
+            st.subheader("State Banking Connectivity Metrics")
+            
+            # Calculate centrality
+            centrality = nx.degree_centrality(G)
+            betweenness = nx.betweenness_centrality(G)
+            
+            # Create dataframe of metrics
+            metrics_df = pd.DataFrame({
+                'State': list(centrality.keys()),
+                'Connectivity Score': list(centrality.values()),
+                'Betweenness Centrality': list(betweenness.values())
+            })
+            
+            # Add branch count
+            state_branch_counts = df.groupby('estado').size().reset_index(name='Branch Count')
+            state_branch_counts.columns = ['State', 'Branch Count']
+            
+            metrics_df = metrics_df.merge(state_branch_counts, on='State', how='left')
+            metrics_df = metrics_df.sort_values('Connectivity Score', ascending=False)
+            
+            # Display metrics
+            st.dataframe(metrics_df, use_container_width=True)
+            
+            # Visualize network
+            nt = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black")
+            nt.from_nx(G)
+            nt.set_options("""
+            var options = {
+                "nodes": {
+                    "borderWidth": 2,
+                    "borderWidthSelected": 4,
+                    "font": {"size": 12}
+                },
+                "edges": {
+                    "color": {
+                        "inherit": false
+                    },
+                    "smooth": {
+                        "type": "continuous",
+                        "forceDirection": "none"
+                    }
+                },
+                "physics": {
+                    "enabled": false,
+                    "stabilization": {
+                        "enabled": true,
+                        "iterations": 2000,
+                        "updateInterval": 1
+                    }
+                }
+            }
+            """)
+            
+            # Save and display
+            with tempfile.NamedTemporaryFile(suffix='.html') as fp:
+                nt.save_graph(fp.name)
+                with open(fp.name, 'r', encoding='utf-8') as f:
+                    html = f.read()
+            
+            st.components.v1.html(html, height=600)
+            
+            # Show states with highest and lowest connectivity
+            st.subheader("States by Banking System Integration")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("Most connected states (banking hubs):")
+                most_connected = metrics_df.head(5)
+                st.dataframe(most_connected)
+                
+            with col2:
+                st.write("Least connected states (banking periphery):")
+                least_connected = metrics_df.tail(5)
+                st.dataframe(least_connected)
+    
+    # Add explanatory expander
+    with st.expander("About Advanced Exploratory Analysis"):
+        st.markdown("""
+        This section contains advanced analytical techniques to extract deeper insights from the banking data:
+        
+        - **Municipality Analysis**: Examines banking presence at the municipality level, identifying areas with high or low banking penetration and potential banking deserts.
+        
+        - **Spatial Clustering**: Uses machine learning algorithms (DBSCAN, K-Means, or Hierarchical clustering) to identify natural geographic clusters of bank branches, revealing patterns in bank distribution strategies.
+        
+        - **Predictive Modeling**: Builds regression models to predict banking presence metrics based on demographic factors, identifying states with higher or lower than expected banking presence.
+        
+        - **Network Analysis**: Applies graph theory to visualize and analyze relationships between banks, states, and cities, revealing the connectivity of the Mexican banking system.
+        
+        These analyses leverage techniques from data science, spatial statistics, and network theory to provide a comprehensive view of banking distribution in Mexico.
+        """)
+    
     # --- Add Disclaimer at Bottom ---
     st.info(
         "Analysis based on data from banxico_branches-complete.csv, which contains a partial dataset covering 9 states in Mexico. Bank names are taken from the 'sucursal' field, branch names from 'direccion', and addresses from 'horario' field in the dataset. Population data used for density calculations is estimated for 2024."
