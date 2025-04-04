@@ -1,0 +1,7 @@
+[theme]
+base="light"
+primaryColor="#0077CC" # Optional: Set your primary accent color (e.g., Bright Blue)
+backgroundColor="#FFFFFF" # Optional: Set base background to white
+secondaryBackgroundColor="#F0F8FF" # Optional: Set a secondary background (e.g., AliceBlue for sidebars/expanders)
+textColor="#002244" # Optional: Set default text color (e.g., Dark Blue)
+font="sans serif" # Optional: Set font 
