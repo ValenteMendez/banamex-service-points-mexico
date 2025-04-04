@@ -663,6 +663,18 @@ def run_streamlit_ui():
             st.metric(label, f"{value:,}")
             st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- Add Methodology Note ---
+    st.markdown(
+        """
+        <p style='font-size: 0.9rem; font-style: italic; color: #555;'>
+        Note: The data for this analysis represents an subset of total bank branches (around 12K). Obtaining up-to-date, comprehensive, precise location data for all bank branches is challenging.
+        This dataset is estimated to cover approximately 90% of the national branch network, providing a robust basis for the presented analysis and calculations.
+        </p>
+        """,
+        unsafe_allow_html=True
+    )
+    # --- End Methodology Note ---
+
     # --- Apply Filter and Create the main 'df' for analysis ---
     df = raw_df.copy() # Start with a copy of the raw data
 
@@ -845,18 +857,18 @@ def run_streamlit_ui():
     top_bank_pct = round((top_bank_count / len(df) * 100), 1)
     
     bank_metrics_col1, bank_metrics_col2, bank_metrics_col3 = st.columns(3)
-    with bank_metrics_col1:
-        st.metric("Total Banks", f"{total_banks:,}")
-    with bank_metrics_col2:
-        st.metric("Leading Bank", top_bank)
-    with bank_metrics_col3:
-        st.metric("Market Share", f"{top_bank_pct}%", help=f"{top_bank} has {top_bank_count:,} branches")
+    # with bank_metrics_col1:
+    #     st.metric("Total Banks", f"{total_banks:,}")
+    # with bank_metrics_col2:
+    #     st.metric("Leading Bank", top_bank)
+    # with bank_metrics_col3:
+    #     st.metric("Market Share", f"{top_bank_pct}%", help=f"{top_bank} has {top_bank_count:,} branches")
     
     # Interactive Bank Distribution
     st.markdown("<h2 class='sub-header'>Bank Market Distribution</h2>", unsafe_allow_html=True)
     
     # Set up tabs for different views of bank data
-    bank_tab1, bank_tab2, bank_tab3, bank_tab4 = st.tabs(["📊 Bank Ranking", "🔍 Top Banks Analysis", "🔄 Compare Banks", "🏆 Competitive Analysis"])
+    bank_tab1, bank_tab4 = st.tabs(["📊 Bank Ranking", "🏆 Competitive Analysis"])
     
     # -- Tab 1: Bank Ranking --
     with bank_tab1:
@@ -871,441 +883,428 @@ def run_streamlit_ui():
         display_count = df['banco'].nunique() if selected_bank_count == "All" else selected_bank_count
         
         # Allow user to choose between horizontal and vertical layout
-        layout_type = st.radio(
-            "Chart layout:",
-            options=["Horizontal (better for many banks)", "Vertical (better for comparison)"],
-            horizontal=True
-        )
+        # layout_type = st.radio(
+        #     "Chart layout:",
+        #     options=["Horizontal (better for many banks)", "Vertical (better for comparison)"],
+        #     horizontal=True
+        # )
         
         bank_counts = analyze_bank_distribution(df, top_n=display_count)
         
         # Create a custom color scale based on bank size
-        custom_colors = px.colors.sequential.BuPu[::-1]  # Reverse the color scale
+        # custom_colors = px.colors.sequential.BuPu[::-1]  # Reverse the color scale
         
-        if layout_type == "Horizontal":
-            # Horizontal bar chart (better for many banks)
-            fig_bank_bar = px.bar(
-                bank_counts.sort_values('Number of Branches'), 
-                y='Bank', 
-                x='Number of Branches',
-                title=f'Top {display_count} Banks by Branch Count',
-                text='Number of Branches',
-                color='Number of Branches',
-                color_continuous_scale=custom_colors,
-                hover_data=['Percentage']
-            )
+        # if layout_type == "Horizontal":
+        # Horizontal bar chart (better for many banks)
+        fig_bank_bar = px.bar(
+            bank_counts.sort_values('Number of Branches'), 
+            y='Bank', 
+            x='Number of Branches',
+            title=f'Top {display_count} Banks by Branch Count',
+            text='Number of Branches',
+            # color='Number of Branches', # Removed color mapping
+            # color_continuous_scale=custom_colors, # Removed color mapping
+            color_discrete_sequence=['#AE2525'], # Set uniform color (Lighter Banxico Red)
+            hover_data=['Percentage']
+        )
             
-            fig_bank_bar.update_traces(
-                texttemplate='%{x:,.0f}', 
-                textposition='outside',
-                hovertemplate='<b>Bank:</b> %{y}<br><b>Branches:</b> %{x:,}<br><b>Market Share:</b> %{customdata[0]:.1f}%<extra></extra>'
-            )
-            
-            fig_bank_bar.update_layout(
-                height=max(500, display_count * 25),  # Dynamically adjust height
-                yaxis_title="",
-                xaxis_title="Number of Branches",
-                margin=dict(l=220, r=50, t=50, b=50),
-                coloraxis_showscale=False
-            )
-            
-        else:
-            # Vertical bar chart (better for comparing values)
-            fig_bank_bar = px.bar(
-                bank_counts, 
-                x='Bank', 
-                y='Number of Branches',
-                title=f'Top {display_count} Banks by Branch Count',
-                text='Number of Branches',
-                color='Number of Branches',
-                color_continuous_scale=custom_colors,
-                hover_data=['Percentage']
-            )
-            
-            fig_bank_bar.update_traces(
-                texttemplate='%{y:,.0f}', 
-                textposition='outside',
-                hovertemplate='<b>Bank:</b> %{x}<br><b>Branches:</b> %{y:,}<br><b>Market Share:</b> %{customdata[0]:.1f}%<extra></extra>'
-            )
-            
-            fig_bank_bar.update_layout(
-                height=600,
-                xaxis_title="",
-                yaxis_title="Number of Branches",
-                xaxis_tickangle=-45,
-                margin=dict(l=50, r=50, t=50, b=120),
-                coloraxis_showscale=False
-            )
+        # else:
+        #     # Vertical bar chart (better for comparing values)
+        #     fig_bank_bar = px.bar(
+        #         bank_counts, 
+        #         x='Bank', 
+        #         y='Number of Branches',
+        #         title=f'Top {display_count} Banks by Branch Count',
+        #         text='Number of Branches',
+        #         color='Number of Branches',
+        #         color_continuous_scale=custom_colors,
+        #         hover_data=['Percentage']
+        #     )
         
+        fig_bank_bar.update_traces(
+            texttemplate='%{x:,.0f}', 
+            textposition='outside',
+            hovertemplate='<b>Bank:</b> %{y}<br><b>Branches:</b> %{x:,}<br><b>Market Share:</b> %{customdata[0]:.1f}%<extra></extra>'
+        )
+            
+        fig_bank_bar.update_layout(
+            height=max(500, display_count * 25),  # Dynamically adjust height
+            yaxis_title="",
+            # xaxis_title="Number of Branches", # Removed title
+            xaxis=dict(visible=False), # Hide x-axis completely
+            margin=dict(l=220, r=50, t=50, b=50),
+            coloraxis_showscale=False # Ensure color scale is not shown
+        )
+            
         st.plotly_chart(fig_bank_bar, use_container_width=True)
         
     # -- Tab 2: Top Banks Analysis -- 
-    with bank_tab2:
-        # More detailed analysis of top banks
-        st.markdown("<h3>Leading Banks Detailed Analysis</h3>", unsafe_allow_html=True)
-        
-        # Allow user to select number of top banks to analyze
-        top_n_banks = st.slider("Number of top banks to analyze:", min_value=3, max_value=10, value=5)
-        
-        top_banks = df['banco'].value_counts().nlargest(top_n_banks).index.tolist()
-        top_banks_df = df[df['banco'].isin(top_banks)]
-        
-        # Geographic spread analysis of top banks
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("<h4>Geographic Spread</h4>", unsafe_allow_html=True)
-            # Calculate state coverage for each bank
-            bank_state_coverage = {}
-            for bank in top_banks:
-                states_covered = df[df['banco'] == bank]['estado'].nunique()
-                total_states = df['estado'].nunique()
-                coverage_pct = round((states_covered / total_states * 100), 1)
-                bank_state_coverage[bank] = {
-                    'States Covered': states_covered,
-                    'Total States': total_states,
-                    'Coverage %': coverage_pct
-                }
-            
-            coverage_df = pd.DataFrame.from_dict(bank_state_coverage, orient='index')
-            
-            fig_coverage = px.bar(
-                coverage_df.reset_index(), 
-                x='index', 
-                y='Coverage %',
-                title='State Coverage by Top Banks (%)',
-                labels={'index': 'Bank'},
-                color='Coverage %',
-                color_continuous_scale='Reds',
-                text='Coverage %'
-            )
-            
-            fig_coverage.update_traces(
-                texttemplate='%{y:.1f}%',
-                textposition='outside'
-            )
-            
-            fig_coverage.update_layout(
-                height=400,
-                xaxis_title="",
-                yaxis_title="% of States Covered",
-                yaxis_range=[0, 100]
-            )
-            
-            st.plotly_chart(fig_coverage, use_container_width=True)
-        
-        with col2:
-            st.markdown("<h4>Branch Concentration</h4>", unsafe_allow_html=True)
-            
-            # Calculate concentration in top 3 states for each bank
-            bank_concentration = []
-            
-            for bank in top_banks:
-                bank_df = df[df['banco'] == bank]
-                total_branches = len(bank_df)
-                state_counts = bank_df['estado'].value_counts()
-                top_3_states = state_counts.nlargest(3)
-                top_3_pct = round((top_3_states.sum() / total_branches * 100), 1)
-                
-                top_state = state_counts.index[0] if not state_counts.empty else "N/A"
-                top_state_pct = round((state_counts.iloc[0] / total_branches * 100), 1) if not state_counts.empty else 0
-                
-                bank_concentration.append({
-                    'Bank': bank,
-                    'Top 3 States %': top_3_pct,
-                    'Leading State': top_state,
-                    'Leading State %': top_state_pct
-                })
-            
-            concentration_df = pd.DataFrame(bank_concentration)
-            
-            fig_concentration = px.bar(
-                concentration_df,
-                x='Bank',
-                y='Top 3 States %',
-                title='Branch Concentration in Top 3 States (%)',
-                color='Leading State %',
-                color_continuous_scale='Blues',
-                text='Top 3 States %',
-                hover_data=['Leading State', 'Leading State %']
-            )
-            
-            fig_concentration.update_traces(
-                texttemplate='%{y:.1f}%',
-                textposition='outside',
-                hovertemplate='<b>Bank:</b> %{x}<br>' +
-                              '<b>Top 3 States:</b> %{y:.1f}%<br>' +
-                              '<b>Leading State:</b> %{customdata[0]}<br>' +
-                              '<b>Leading State Share:</b> %{customdata[1]:.1f}%<extra></extra>'
-            )
-            
-            fig_concentration.update_layout(
-                height=400,
-                xaxis_title="",
-                yaxis_title="% of Branches in Top 3 States",
-                yaxis_range=[0, 100]
-            )
-            
-            st.plotly_chart(fig_concentration, use_container_width=True)
-        
-        # Branch network comparison for selected banks
-        st.markdown("<h4>Branch Network Comparison</h4>", unsafe_allow_html=True)
-        
-        # Allow selecting which top banks to compare
-        selected_compare_banks = st.multiselect(
-            "Select banks to compare:",
-            options=top_banks,
-            default=top_banks[:min(5, len(top_banks))]
-        )
-        
-        if selected_compare_banks:
-            compare_df = df[df['banco'].isin(selected_compare_banks)]
-            
-            # Create a radar chart for comparison across key metrics
-            bank_metrics = []
-            
-            for bank in selected_compare_banks:
-                bank_df = df[df['banco'] == bank]
-                total_branches = len(bank_df)
-                
-                # Calculate metrics
-                states_covered = bank_df['estado'].nunique()
-                cities_covered = bank_df['ciudad'].nunique()
-                
-                # Normalize metrics for radar chart
-                max_states = df['estado'].nunique()
-                states_norm = round((states_covered / max_states * 100), 1)
-                
-                max_cities = df['ciudad'].nunique()
-                cities_norm = round((cities_covered / max_cities * 100), 1)
-                
-                # Calculate branch density (branches per state)
-                branch_per_state = round((total_branches / states_covered), 1)
-                max_branch_per_state = 50  # Adjust based on data
-                branch_density_norm = min(round((branch_per_state / max_branch_per_state * 100), 1), 100)
-                
-                # Market share
-                market_share = round((total_branches / len(df) * 100), 1)
-                
-                bank_metrics.append({
-                    'Bank': bank,
-                    'Geographic Coverage': states_norm,
-                    'Urban Presence': cities_norm,
-                    'Branch Density': branch_density_norm,
-                    'Market Share': market_share,
-                    'Absolute Branches': total_branches
-                })
-            
-            metrics_df = pd.DataFrame(bank_metrics)
-            
-            # Create a spider/radar chart
-            categories = ['Geographic Coverage', 'Urban Presence', 'Branch Density', 'Market Share']
-            
-            fig_radar = go.Figure()
-            
-            for i, bank in enumerate(metrics_df['Bank']):
-                bank_data = metrics_df[metrics_df['Bank'] == bank]
-                values = bank_data[categories].values.flatten().tolist()
-                values.append(values[0])  # Close the loop
-                
-                fig_radar.add_trace(go.Scatterpolar(
-                    r=values,
-                    theta=categories + [categories[0]],  # Close the loop
-                    fill='toself',
-                    name=f"{bank} ({bank_data['Absolute Branches'].values[0]:,} branches)"
-                ))
-            
-            fig_radar.update_layout(
-                polar=dict(
-                    radialaxis=dict(
-                        visible=True,
-                        range=[0, 100]
-                    )
-                ),
-                showlegend=True,
-                title="Bank Network Comparison (normalized metrics)",
-                height=500
-            )
-            
-            st.plotly_chart(fig_radar, use_container_width=True)
-            
-            # Show the raw data in a table
-            with st.expander("View detailed metrics table"):
-                display_metrics = metrics_df.copy()
-                # Add the original values for context
-                for bank in selected_compare_banks:
-                    bank_df = df[df['banco'] == bank]
-                    idx = display_metrics[display_metrics['Bank'] == bank].index
-                    display_metrics.loc[idx, 'States Covered'] = bank_df['estado'].nunique()
-                    display_metrics.loc[idx, 'Cities Covered'] = bank_df['ciudad'].nunique()
-                    
-                # Reorder columns for display
-                display_cols = ['Bank', 'Absolute Branches', 'States Covered', 'Cities Covered', 
-                                'Market Share', 'Geographic Coverage', 'Urban Presence', 'Branch Density']
-                display_metrics = display_metrics[display_cols]
-                st.dataframe(display_metrics.set_index('Bank'), use_container_width=True)
-        
-        else:
-            st.info("Please select at least one bank to display the comparison.")
+    # with bank_tab2:
+    #     # More detailed analysis of top banks
+    #     st.markdown("<h3>Leading Banks Detailed Analysis</h3>", unsafe_allow_html=True)
+    #     
+    #     # Allow user to select number of top banks to analyze
+    #     top_n_banks = st.slider("Number of top banks to analyze:", min_value=3, max_value=10, value=5)
+    #     
+    #     top_banks = df['banco'].value_counts().nlargest(top_n_banks).index.tolist()
+    #     top_banks_df = df[df['banco'].isin(top_banks)]
+    #     
+    #     # Geographic spread analysis of top banks
+    #     col1, col2 = st.columns(2)
+    #     
+    #     with col1:
+    #         st.markdown("<h4>Geographic Spread</h4>", unsafe_allow_html=True)
+    #         # Calculate state coverage for each bank
+    #         bank_state_coverage = {}
+    #         for bank in top_banks:
+    #             states_covered = df[df['banco'] == bank]['estado'].nunique()
+    #             total_states = df['estado'].nunique()
+    #             coverage_pct = round((states_covered / total_states * 100), 1)
+    #             bank_state_coverage[bank] = {
+    #                 'States Covered': states_covered,
+    #                 'Total States': total_states,
+    #                 'Coverage %': coverage_pct
+    #             }
+    #         
+    #         coverage_df = pd.DataFrame.from_dict(bank_state_coverage, orient='index')
+    #         
+    #         fig_coverage = px.bar(
+    #             coverage_df.reset_index(), 
+    #             x='index', 
+    #             y='Coverage %',
+    #             title='State Coverage by Top Banks (%)',
+    #             labels={'index': 'Bank'},
+    #             color='Coverage %',
+    #             color_continuous_scale='Reds',
+    #             text='Coverage %'
+    #         )
+    #         
+    #         fig_coverage.update_traces(
+    #             texttemplate='%{y:.1f}%',
+    #             textposition='outside'
+    #         )
+    #         
+    #         fig_coverage.update_layout(
+    #             height=400,
+    #             xaxis_title="",
+    #             yaxis_title="% of States Covered",
+    #             yaxis_range=[0, 100]
+    #         )
+    #         
+    #         st.plotly_chart(fig_coverage, use_container_width=True)
+    #     
+    #     with col2:
+    #         st.markdown("<h4>Branch Concentration</h4>", unsafe_allow_html=True)
+    #         
+    #         # Calculate concentration in top 3 states for each bank
+    #         bank_concentration = []
+    #         
+    #         for bank in top_banks:
+    #             bank_df = df[df['banco'] == bank]
+    #             total_branches = len(bank_df)
+    #             state_counts = bank_df['estado'].value_counts()
+    #             top_3_states = state_counts.nlargest(3)
+    #             top_3_pct = round((top_3_states.sum() / total_branches * 100), 1)
+    #             
+    #             top_state = state_counts.index[0] if not state_counts.empty else "N/A"
+    #             top_state_pct = round((state_counts.iloc[0] / total_branches * 100), 1) if not state_counts.empty else 0
+    #             
+    #             bank_concentration.append({
+    #                 'Bank': bank,
+    #                 'Top 3 States %': top_3_pct,
+    #                 'Leading State': top_state,
+    #                 'Leading State %': top_state_pct
+    #             })
+    #         
+    #         concentration_df = pd.DataFrame(bank_concentration)
+    #         
+    #         fig_concentration = px.bar(
+    #             concentration_df,
+    #             x='Bank',
+    #             y='Top 3 States %',
+    #             title='Branch Concentration in Top 3 States (%)',
+    #             color='Leading State %',
+    #             color_continuous_scale='Blues',
+    #             text='Top 3 States %',
+    #             hover_data=['Leading State', 'Leading State %']
+    #         )
+    #         
+    #         fig_concentration.update_traces(
+    #             texttemplate='%{y:.1f}%',
+    #             textposition='outside',
+    #             hovertemplate='<b>Bank:</b> %{x}<br>' +
+    #                           '<b>Top 3 States:</b> %{y:.1f}%<br>' +
+    #                           '<b>Leading State:</b> %{customdata[0]}<br>' +
+    #                           '<b>Leading State Share:</b> %{customdata[1]:.1f}%<extra></extra>'
+    #         )
+    #         
+    #         fig_concentration.update_layout(
+    #             height=400,
+    #             xaxis_title="",
+    #             yaxis_title="% of Branches in Top 3 States",
+    #             yaxis_range=[0, 100]
+    #         )
+    #         
+    #         st.plotly_chart(fig_concentration, use_container_width=True)
+    #     
+    #     # Branch network comparison for selected banks
+    #     st.markdown("<h4>Branch Network Comparison</h4>", unsafe_allow_html=True)
+    #     
+    #     # Allow selecting which top banks to compare
+    #     selected_compare_banks = st.multiselect(
+    #         "Select banks to compare:",
+    #         options=top_banks,
+    #         default=top_banks[:min(5, len(top_banks))]
+    #     )
+    #     
+    #     if selected_compare_banks:
+    #         compare_df = df[df['banco'].isin(selected_compare_banks)]
+    #         
+    #         # Create a radar chart for comparison across key metrics
+    #         bank_metrics = []
+    #         
+    #         for bank in selected_compare_banks:
+    #             bank_df = df[df['banco'] == bank]
+    #             total_branches = len(bank_df)
+    #             
+    #             # Calculate metrics
+    #             states_covered = bank_df['estado'].nunique()
+    #             cities_covered = bank_df['ciudad'].nunique()
+    #             
+    #             # Normalize metrics for radar chart
+    #             max_states = df['estado'].nunique()
+    #             states_norm = round((states_covered / max_states * 100), 1)
+    #             
+    #             max_cities = df['ciudad'].nunique()
+    #             cities_norm = round((cities_covered / max_cities * 100), 1)
+    #             
+    #             # Calculate branch density (branches per state)
+    #             branch_per_state = round((total_branches / states_covered), 1)
+    #             max_branch_per_state = 50  # Adjust based on data
+    #             branch_density_norm = min(round((branch_per_state / max_branch_per_state * 100), 1), 100)
+    #             
+    #             # Market share
+    #             market_share = round((total_branches / len(df) * 100), 1)
+    #             
+    #             bank_metrics.append({
+    #                 'Bank': bank,
+    #                 'Geographic Coverage': states_norm,
+    #                 'Urban Presence': cities_norm,
+    #                 'Branch Density': branch_density_norm,
+    #                 'Market Share': market_share,
+    #                 'Absolute Branches': total_branches
+    #             })
+    #         
+    #         metrics_df = pd.DataFrame(bank_metrics)
+    #         
+    #         # Create a spider/radar chart
+    #         categories = ['Geographic Coverage', 'Urban Presence', 'Branch Density', 'Market Share']
+    #         
+    #         fig_radar = go.Figure()
+    #         
+    #         for i, bank in enumerate(metrics_df['Bank']):
+    #             bank_data = metrics_df[metrics_df['Bank'] == bank]
+    #             values = bank_data[categories].values.flatten().tolist()
+    #             values.append(values[0])  # Close the loop
+    #             
+    #             fig_radar.add_trace(go.Scatterpolar(
+    #                 r=values,
+    #                 theta=categories + [categories[0]],  # Close the loop
+    #                 fill='toself',
+    #                 name=f"{bank} ({bank_data['Absolute Branches'].values[0]:,} branches)"
+    #             ))
+    #         
+    #         fig_radar.update_layout(
+    #             polar=dict(
+    #                 radialaxis=dict(
+    #                     visible=True,
+    #                     range=[0, 100]
+    #                 )
+    #             ),
+    #             showlegend=True,
+    #             title="Bank Network Comparison (normalized metrics)",
+    #             height=500
+    #         )
+    #         
+    #         st.plotly_chart(fig_radar, use_container_width=True)
+    #         
+    #         # Show the raw data in a table
+    #         with st.expander("View detailed metrics table"):
+    #             display_metrics = metrics_df.copy()
+    #             # Add the original values for context
+    #             for bank in selected_compare_banks:
+    #                 bank_df = df[df['banco'] == bank]
+    #                 idx = display_metrics[display_metrics['Bank'] == bank].index
+    #                 display_metrics.loc[idx, 'States Covered'] = bank_df['estado'].nunique()
+    #                 display_metrics.loc[idx, 'Cities Covered'] = bank_df['ciudad'].nunique()
+    #                 
+    #             # Reorder columns for display
+    #             display_cols = ['Bank', 'Absolute Branches', 'States Covered', 'Cities Covered', 
+    #                             'Market Share', 'Geographic Coverage', 'Urban Presence', 'Branch Density']
+    #             display_metrics = display_metrics[display_cols]
+    #             st.dataframe(display_metrics.set_index('Bank'), use_container_width=True)
+    #     
+    #     else:
+    #         st.info("Please select at least one bank to display the comparison.")
     
     # -- Tab 3: Compare Banks --
-    with bank_tab3:
-        st.markdown("<h3>Custom Bank Comparison</h3>", unsafe_allow_html=True)
-        
-        # Allow selecting any banks to compare
-        all_banks = sorted(df['banco'].unique())
-        custom_compare_banks = st.multiselect(
-            "Select banks to compare:",
-            options=all_banks,
-            default=all_banks[:min(3, len(all_banks))] if all_banks else []
-        )
-        
-        if len(custom_compare_banks) > 1:
-            compare_banks_df = df[df['banco'].isin(custom_compare_banks)]
-            
-            # Branch count comparison
-            bank_branch_counts = compare_banks_df['banco'].value_counts().reset_index()
-            bank_branch_counts.columns = ['Bank', 'Branch Count']
-            bank_branch_counts['Market Share (%)'] = bank_branch_counts['Branch Count'].apply(lambda x: round((x / len(df) * 100), 2))
-            
-            # Sort by branch count
-            bank_branch_counts = bank_branch_counts.sort_values('Branch Count', ascending=False)
-            
-            # Create a horizontal bar chart
-            fig_bank_compare = px.bar(
-                bank_branch_counts,
-                y='Bank',
-                x='Branch Count',
-                text='Branch Count',
-                color='Market Share (%)',
-                color_continuous_scale='Viridis',
-                title='Branch Network Size Comparison',
-                hover_data=['Market Share (%)']
-            )
-            
-            fig_bank_compare.update_traces(
-                texttemplate='%{x:,}',
-                textposition='outside',
-                hovertemplate='<b>Bank:</b> %{y}<br><b>Branches:</b> %{x:,}<br><b>Market Share:</b> %{customdata[0]:.2f}%<extra></extra>'
-            )
-            
-            fig_bank_compare.update_layout(
-                height=max(400, len(custom_compare_banks) * 40),
-                yaxis_title="",
-                xaxis_title="Number of Branches"
-            )
-            
-            st.plotly_chart(fig_bank_compare, use_container_width=True)
-            
-            # Geographic presence comparison
-            st.markdown("<h4>Geographic Presence Comparison</h4>", unsafe_allow_html=True)
-            
-            # State coverage comparison
-            bank_state_data = []
-            
-            for bank in custom_compare_banks:
-                bank_df = df[df['banco'] == bank]
-                states_present = bank_df['estado'].value_counts().reset_index()
-                states_present.columns = ['State', 'Branch Count']
-                states_present['Bank'] = bank
-                states_present['% of Bank Branches'] = states_present['Branch Count'].apply(lambda x: round((x / len(bank_df) * 100), 1))
-                bank_state_data.append(states_present)
-            
-            all_bank_state_data = pd.concat(bank_state_data)
-            
-            # Create a grouped bar chart by state and bank
-            fig_state_presence = px.bar(
-                all_bank_state_data,
-                x='State',
-                y='Branch Count',
-                color='Bank',
-                title='State Presence Comparison',
-                barmode='group',
-                hover_data=['% of Bank Branches']
-            )
-            
-            fig_state_presence.update_layout(
-                height=500,
-                xaxis_title="",
-                yaxis_title="Branch Count",
-                xaxis_tickangle=-45,
-                margin=dict(l=50, r=50, t=50, b=120)
-            )
-            
-            # Add a dropdown to filter states
-            all_states = sorted(all_bank_state_data['State'].unique())
-            
-            # Determine which states to preselect (those with most banks present)
-            state_bank_counts = all_bank_state_data.groupby('State')['Bank'].nunique().sort_values(ascending=False)
-            preselected_states = state_bank_counts.head(10).index.tolist()
-            
-            selected_states = st.multiselect(
-                "Select states to compare:",
-                options=all_states,
-                default=preselected_states if preselected_states else all_states[:min(10, len(all_states))]
-            )
-            
-            if selected_states:
-                filtered_data = all_bank_state_data[all_bank_state_data['State'].isin(selected_states)]
-                
-                fig_filtered_presence = px.bar(
-                    filtered_data,
-                    x='State',
-                    y='Branch Count',
-                    color='Bank',
-                    title=f'State Presence Comparison ({len(selected_states)} states)',
-                    barmode='group',
-                    hover_data=['% of Bank Branches']
-                )
-                
-                fig_filtered_presence.update_layout(
-                    height=500,
-                    xaxis_title="",
-                    yaxis_title="Branch Count",
-                    xaxis_tickangle=-45,
-                    margin=dict(l=50, r=50, t=50, b=120)
-                )
-                
-                st.plotly_chart(fig_filtered_presence, use_container_width=True)
-            else:
-                st.info("Please select at least one state to display the comparison.")
-            
-            # Display a heatmap of bank presence across states
-            st.markdown("<h4>Bank Presence Heatmap</h4>", unsafe_allow_html=True)
-            
-            # Create a pivot table for the heatmap
-            presence_pivot = all_bank_state_data.pivot_table(
-                values='Branch Count',
-                index='Bank',
-                columns='State',
-                fill_value=0
-            )
-            
-            # Filter to selected states if any
-            if selected_states:
-                presence_pivot = presence_pivot[selected_states]
-            
-            # Normalize by row (bank) to show distribution pattern
-            normalized_pivot = presence_pivot.div(presence_pivot.sum(axis=1), axis=0) * 100
-            
-            fig_heatmap = px.imshow(
-                normalized_pivot,
-                title="Bank Branch Distribution Across States (%)",
-                labels=dict(x="State", y="Bank", color="% of Branches"),
-                color_continuous_scale="Viridis",
-                aspect="auto"
-            )
-            
-            fig_heatmap.update_layout(
-                height=max(400, len(custom_compare_banks) * 30),
-                xaxis_tickangle=-45,
-                margin=dict(l=50, r=50, t=50, b=120)
-            )
-            
-            st.plotly_chart(fig_heatmap, use_container_width=True)
-            
-        else:
-            st.info("Please select at least two banks to display the comparison.")
+    # with bank_tab3:
+    #     st.markdown("<h3>Custom Bank Comparison</h3>", unsafe_allow_html=True)
+    #     
+    #     # Allow selecting any banks to compare
+    #     all_banks = sorted(df['banco'].unique())
+    #     custom_compare_banks = st.multiselect(
+    #         "Select banks to compare:",
+    #         options=all_banks,
+    #         default=all_banks[:min(3, len(all_banks))] if all_banks else []
+    #     )
+    #     
+    #     if len(custom_compare_banks) > 1:
+    #         compare_banks_df = df[df['banco'].isin(custom_compare_banks)]
+    #         
+    #         # Branch count comparison
+    #         bank_branch_counts = compare_banks_df['banco'].value_counts().reset_index()
+    #         bank_branch_counts.columns = ['Bank', 'Branch Count']
+    #         bank_branch_counts['Market Share (%)'] = bank_branch_counts['Branch Count'].apply(lambda x: round((x / len(df) * 100), 2))
+    #         
+    #         # Sort by branch count
+    #         bank_branch_counts = bank_branch_counts.sort_values('Branch Count', ascending=False)
+    #         
+    #         # Create a horizontal bar chart
+    #         fig_bank_compare = px.bar(
+    #             bank_branch_counts,
+    #             y='Bank',
+    #             x='Branch Count',
+    #             text='Branch Count',
+    #             color='Market Share (%)',
+    #             color_continuous_scale='Viridis',
+    #             title='Branch Network Size Comparison',
+    #             hover_data=['Market Share (%)']
+    #         )
+    #         
+    #         fig_bank_compare.update_traces(
+    #             texttemplate='%{x:,}',
+    #             textposition='outside',
+    #             hovertemplate='<b>Bank:</b> %{y}<br><b>Branches:</b> %{x:,}<br><b>Market Share:</b> %{customdata[0]:.2f}%<extra></extra>'
+    #         )
+    #         
+    #         fig_bank_compare.update_layout(
+    #             height=max(400, len(custom_compare_banks) * 40),
+    #             yaxis_title="",
+    #             xaxis_title="Number of Branches"
+    #         )
+    #         
+    #         st.plotly_chart(fig_bank_compare, use_container_width=True)
+    #         
+    #         # Geographic presence comparison
+    #         st.markdown("<h4>Geographic Presence Comparison</h4>", unsafe_allow_html=True)
+    #         
+    #         # State coverage comparison
+    #         bank_state_data = []
+    #         
+    #         for bank in custom_compare_banks:
+    #             bank_df = df[df['banco'] == bank]
+    #             states_present = bank_df['estado'].value_counts().reset_index()
+    #             states_present.columns = ['State', 'Branch Count']
+    #             states_present['Bank'] = bank
+    #             states_present['% of Bank Branches'] = states_present['Branch Count'].apply(lambda x: round((x / len(bank_df) * 100), 1))
+    #             bank_state_data.append(states_present)
+    #         
+    #         all_bank_state_data = pd.concat(bank_state_data)
+    #         
+    #         # Create a grouped bar chart by state and bank
+    #         fig_state_presence = px.bar(
+    #             all_bank_state_data,
+    #             x='State',
+    #             y='Branch Count',
+    #             color='Bank',
+    #             title='State Presence Comparison',
+    #             barmode='group',
+    #             hover_data=['% of Bank Branches']
+    #         )
+    #         
+    #         fig_state_presence.update_layout(
+    #             height=500,
+    #             xaxis_title="",
+    #             yaxis_title="Branch Count",
+    #             xaxis_tickangle=-45,
+    #             margin=dict(l=50, r=50, t=50, b=120)
+    #         )
+    #         
+    #         # Add a dropdown to filter states
+    #         all_states = sorted(all_bank_state_data['State'].unique())
+    #         
+    #         # Determine which states to preselect (those with most banks present)
+    #         state_bank_counts = all_bank_state_data.groupby('State')['Bank'].nunique().sort_values(ascending=False)
+    #         preselected_states = state_bank_counts.head(10).index.tolist()
+    #         
+    #         selected_states = st.multiselect(
+    #             "Select states to compare:",
+    #             options=all_states,
+    #             default=preselected_states if preselected_states else all_states[:min(10, len(all_states))]
+    #         )
+    #         
+    #         if selected_states:
+    #             filtered_data = all_bank_state_data[all_bank_state_data['State'].isin(selected_states)]
+    #             
+    #             fig_filtered_presence = px.bar(
+    #                 filtered_data,
+    #                 x='State',
+    #                 y='Branch Count',
+    #                 color='Bank',
+    #                 title=f'State Presence Comparison ({len(selected_states)} states)',
+    #                 barmode='group',
+    #                 hover_data=['% of Bank Branches']
+    #             )
+    #             
+    #             fig_filtered_presence.update_layout(
+    #                 height=500,
+    #                 xaxis_title="",
+    #                 yaxis_title="Branch Count",
+    #                 xaxis_tickangle=-45,
+    #                 margin=dict(l=50, r=50, t=50, b=120)
+    #             )
+    #             
+    #             st.plotly_chart(fig_filtered_presence, use_container_width=True)
+    #         else:
+    #             st.info("Please select at least one state to display the comparison.")
+    #         
+    #         # Display a heatmap of bank presence across states
+    #         st.markdown("<h4>Bank Presence Heatmap</h4>", unsafe_allow_html=True)
+    #         
+    #         # Create a pivot table for the heatmap
+    #         presence_pivot = all_bank_state_data.pivot_table(
+    #             values='Branch Count',
+    #             index='Bank',
+    #             columns='State',
+    #             fill_value=0
+    #         )
+    #         
+    #         # Filter to selected states if any
+    #         if selected_states:
+    #             presence_pivot = presence_pivot[selected_states]
+    #         
+    #         # Normalize by row (bank) to show distribution pattern
+    #         normalized_pivot = presence_pivot.div(presence_pivot.sum(axis=1), axis=0) * 100
+    #         
+    #         fig_heatmap = px.imshow(
+    #             normalized_pivot,
+    #             title="Bank Branch Distribution Across States (%)",
+    #             labels=dict(x="State", y="Bank", color="% of Branches"),
+    #             color_continuous_scale="Viridis",
+    #             aspect="auto"
+    #         )
+    #         
+    #         fig_heatmap.update_layout(
+    #             height=max(400, len(custom_compare_banks) * 30),
+    #             xaxis_tickangle=-45,
+    #             margin=dict(l=50, r=50, t=50, b=120)
+    #         )
+    #         
+    #         st.plotly_chart(fig_heatmap, use_container_width=True)
+    #         
+    #     else:
+    #         st.info("Please select at least two banks to display the comparison.")
     
     # -- Tab 4: Competitive Analysis --
     with bank_tab4:
@@ -1398,24 +1397,24 @@ def run_streamlit_ui():
             with col2:
                 competitors_branches = len(competitors_df)
                 branch_delta = central_branches - (competitors_branches / len(competitor_banks))
-                delta_text = f"{branch_delta:+,.0f} vs. avg competitor"
+                #delta_text = f"{branch_delta:+,.0f} vs. avg competitor"
                 
                 st.metric(
                     f"Branch Count", 
                     f"{central_branches:,}",
-                    delta=delta_text,
+                    #delta=delta_text,
                     help=f"Total number of {central_bank} branches compared to competitor average"
                 )
             
             with col3:
                 competitors_avg_states = sum(df[df['banco'] == bank]['estado'].nunique() for bank in competitor_banks) / len(competitor_banks)
                 state_delta = central_states - competitors_avg_states
-                delta_text = f"{state_delta:+,.1f} states vs. avg"
+                #delta_text = f"{state_delta:+,.1f} states vs. avg"
                 
                 st.metric(
                     f"State Coverage", 
                     f"{central_states}/{total_states} states",
-                    delta=delta_text,
+                    #delta=delta_text,
                     help=f"Number of states where {central_bank} has presence vs. the average competitor coverage"
                 )
             
@@ -1458,6 +1457,16 @@ def run_streamlit_ui():
             
             # Convert to DataFrame and display
             metrics_df = pd.DataFrame(bank_metrics)
+            
+            # --- Format numeric columns for display ---
+            format_cols = ['Branch Count', 'States Covered', 'Cities Covered', 'Branches per State', 'Branches per City']
+            for col in format_cols:
+                if col in metrics_df.columns:
+                    metrics_df[col] = metrics_df[col].apply(lambda x: f"{x:,.0f}" if isinstance(x, (int, float)) else x)
+            if 'Market Share (%)' in metrics_df.columns:
+                metrics_df['Market Share (%)'] = metrics_df['Market Share (%)'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+            # --- End Formatting ---
+            
             st.dataframe(metrics_df.set_index('Bank'), use_container_width=True)
             
             # --- Geographic Distribution Comparison ---
@@ -1527,7 +1536,7 @@ def run_streamlit_ui():
                          heatmap_pivot_data[valid_banks_to_show], # Use the pivot data with only existing bank counts
                          labels=dict(x="Bank", y="State", color="Branch Count"),
                          x=valid_banks_to_show,
-                         color_continuous_scale="Viridis",
+                         color_continuous_scale="Greens", # Changed color scale
                          title=f"Branch Distribution by State: {central_bank} vs {competitors_text}",
                          aspect="auto"
                      )
@@ -1564,66 +1573,82 @@ def run_streamlit_ui():
             
             # Display overlap data
             overlap_df = pd.DataFrame(overlap_data)
+            
+            # --- Format numeric columns for display ---
+            format_cols_overlap = ['Cities with Both Banks', f'Cities with only {central_bank}', 'Overlap Percentage']
+            # Dynamically add the competitor-specific column name
+            competitor_specific_col = [col for col in overlap_df.columns if col.startswith('Cities with only ') and col != f'Cities with only {central_bank}']
+            if competitor_specific_col:
+                format_cols_overlap.append(competitor_specific_col[0])
+                
+            for col in format_cols_overlap:
+                if col in overlap_df.columns:
+                    if col == 'Overlap Percentage':
+                         overlap_df[col] = overlap_df[col].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+                    else:
+                        overlap_df[col] = overlap_df[col].apply(lambda x: f"{x:,.0f}" if isinstance(x, (int, float)) else x)
+            # --- End Formatting ---
+            
             st.dataframe(overlap_df.set_index('Competitor'), use_container_width=True)
             
             # Visualize the top 10 states where central bank has advantage/disadvantage
-            st.subheader(f"{central_bank} Competitive Position by State")
+            # st.subheader(f"{central_bank} Competitive Position by State")
             
-            # Calculate advantage/disadvantage for central bank
-            advantage_data = []
+            # # Calculate advantage/disadvantage for central bank
+            # advantage_data = []
             
-            for state in state_pivot['estado'].unique():
-                state_row = state_pivot[state_pivot['estado'] == state].iloc[0]
-                central_share = state_row[f'{central_bank} (%)'] if f'{central_bank} (%)' in state_row else 0
-                
-                # Calculate the average competitor share
-                competitor_shares = [state_row[f'{bank} (%)'] for bank in competitor_banks 
-                                    if f'{bank} (%)' in state_row]
-                avg_competitor_share = sum(competitor_shares) / len(competitor_shares) if competitor_shares else 0
-                
-                # Calculate the advantage
-                advantage = central_share - avg_competitor_share
-                
-                advantage_data.append({
-                    'State': state,
-                    f'{central_bank} Share (%)': round(central_share, 1),
-                    'Avg Competitor Share (%)': round(avg_competitor_share, 1),
-                    'Advantage (pp)': round(advantage, 1)
-                })
-            
-            # Convert to DataFrame
-            advantage_df = pd.DataFrame(advantage_data)
-            
-            # Create two views - states with advantage and disadvantage
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(f"#### Top States with {central_bank} Advantage")
-                top_advantage = advantage_df.sort_values(by='Advantage (pp)', ascending=False).head(10)
-                fig = px.bar(
-                    top_advantage,
-                    x='State',
-                    y='Advantage (pp)',
-                    color='Advantage (pp)',
-                    color_continuous_scale=[(0, "green"), (1, "darkgreen")],
-                    title=f"States where {central_bank} has the largest advantage",
-                    height=400
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown(f"#### Top States with {central_bank} Disadvantage")
-                top_disadvantage = advantage_df.sort_values(by='Advantage (pp)', ascending=True).head(10)
-                fig = px.bar(
-                    top_disadvantage,
-                    x='State',
-                    y='Advantage (pp)',
-                    color='Advantage (pp)',
-                    color_continuous_scale=[(0, "red"), (1, "darkred")],
-                    title=f"States where {central_bank} has the largest disadvantage",
-                    height=400
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            # for state in state_pivot['estado'].unique():
+            #     state_row = state_pivot[state_pivot['estado'] == state].iloc[0]
+            #     central_share = state_row[f'{central_bank} (%)'] if f'{central_bank} (%)' in state_row else 0
+            #     
+            #     # Calculate the average competitor share
+            #     competitor_shares = [state_row[f'{bank} (%)'] for bank in competitor_banks 
+            #                         if f'{bank} (%)' in state_row]
+            #     avg_competitor_share = sum(competitor_shares) / len(competitor_shares) if competitor_shares else 0
+            #     
+            #     # Calculate the advantage
+            #     advantage = central_share - avg_competitor_share
+            #     
+            #     advantage_data.append({
+            #         'State': state,
+            #         f'{central_bank} Share (%)': round(central_share, 1),
+            #         'Avg Competitor Share (%)': round(avg_competitor_share, 1),
+            #         'Advantage (pp)': round(advantage, 1)
+            #     })
+            # 
+            # # Convert to DataFrame
+            # advantage_df = pd.DataFrame(advantage_data)
+            # 
+            # # Create two views - states with advantage and disadvantage
+            # col1, col2 = st.columns(2)
+            # 
+            # with col1:
+            #     st.markdown(f"#### Top States with {central_bank} Advantage")
+            #     top_advantage = advantage_df.sort_values(by='Advantage (pp)', ascending=False).head(10)
+            #     fig = px.bar(
+            #         top_advantage,
+            #         x='State',
+            #         y='Advantage (pp)',
+            #         color='Advantage (pp)',
+            #         color_continuous_scale=[(0, "green"), (1, "darkgreen")],
+            #         title=f"States where {central_bank} has the largest advantage",
+            #         height=400
+            #     )
+            #     st.plotly_chart(fig, use_container_width=True)
+            # 
+            # with col2:
+            #     st.markdown(f"#### Top States with {central_bank} Disadvantage")
+            #     top_disadvantage = advantage_df.sort_values(by='Advantage (pp)', ascending=True).head(10)
+            #     fig = px.bar(
+            #         top_disadvantage,
+            #         x='State',
+            #         y='Advantage (pp)',
+            #         color='Advantage (pp)',
+            #         color_continuous_scale=[(0, "red"), (1, "darkred")],
+            #         title=f"States where {central_bank} has the largest disadvantage",
+            #         height=400
+            #     )
+            #     st.plotly_chart(fig, use_container_width=True)
         
         elif not central_bank:
             st.info("Please select a central bank to display the analysis.")
@@ -1664,19 +1689,20 @@ def run_streamlit_ui():
     with geo_tab1:
         st.markdown("<h3>Banking Infrastructure by State</h3>", unsafe_allow_html=True)
         
-        col1, col2 = st.columns([1, 3])
+        # --- Ranking Options (Moved to top/simplified) ---
+        st.markdown("<h4>Ranking Options</h4>", unsafe_allow_html=True)
         
-        with col1:
-            # State filtering and ranking options
-            st.markdown("<h4>Ranking Options</h4>", unsafe_allow_html=True)
-            
+        ranking_options_col1, ranking_options_col2 = st.columns(2)
+        
+        with ranking_options_col1:
             # Choose ranking metric
             ranking_metric = st.radio(
                 "Rank states by:",
                 options=["Total Branches", "Branch Density (per 100k people)", "Bank Variety"],
                 index=0
             )
-            
+        
+        with ranking_options_col2:
             # Choose number of states to display
             display_n_states = st.slider(
                 "Number of states to display:",
@@ -1686,142 +1712,103 @@ def run_streamlit_ui():
                 step=1
             )
             
-            # Choose sorting order
-            sort_order = st.radio(
-                "Sorting order:",
-                options=["Highest to Lowest", "Lowest to Highest"],
-                index=0,
-                horizontal=True
-            )
+        # --- Chart Display Area ---
+        st.markdown("---") # Separator
+
+        # Prepare data based on selected metric
+        state_distribution = analyze_state_distribution(df)
+        
+        if ranking_metric == "Total Branches":
+            # Already have this from analyze_state_distribution
+            state_data = state_distribution.rename(columns={
+                'State': 'Estado', 
+                'Number of Branches': 'Value'
+            })
+            state_data['Metric'] = 'Total Branches'
             
-            # Display options
-            display_type = st.radio(
-                "Display as:",
-                options=["Bar Chart", "Table"],
-                index=0,
-                horizontal=True
-            )
-            
-        with col2:
-            # Prepare data based on selected metric
-            state_distribution = analyze_state_distribution(df)
-            
-            if ranking_metric == "Total Branches":
-                # Already have this from analyze_state_distribution
-                state_data = state_distribution.rename(columns={
-                    'State': 'Estado', 
-                    'Number of Branches': 'Value'
-                })
-                state_data['Metric'] = 'Total Branches'
+        elif ranking_metric == "Branch Density (per 100k people)":
+            # Calculate branch density
+            density_data = calculate_branch_density(df)
+            if not density_data.empty:
+                state_data = density_data[['estado', 'branches_per_100k']].copy()
+                state_data.columns = ['Estado', 'Value']
+                state_data['Metric'] = 'Branches per 100k people'
+            else:
+                st.warning("Branch density data could not be calculated for all states.")
+                state_data = pd.DataFrame(columns=['Estado', 'Value', 'Metric'])
                 
+        elif ranking_metric == "Bank Variety":
+            # Calculate number of unique banks per state
+            bank_variety = df.groupby('estado')['banco'].nunique().reset_index()
+            bank_variety.columns = ['Estado', 'Value']
+            bank_variety['Metric'] = 'Unique Banks'
+            
+            # Calculate percentage of all banks present
+            total_banks = df['banco'].nunique()
+            bank_variety['Percentage'] = bank_variety['Value'].apply(lambda x: round((x / total_banks * 100), 1))
+            state_data = bank_variety
+        
+        # Sort the data based on user selection (Default: Highest to Lowest)
+        ascending = False # Removed sort_order control, default to descending
+        state_data = state_data.sort_values('Value', ascending=ascending)
+        
+        # Limit to the selected number of states
+        state_data = state_data.head(display_n_states)
+        
+        # --- Always display Bar Chart ---
+        if not state_data.empty:
+            # Create the chart
+            color_scale = 'Reds' if ranking_metric != "Bank Variety" else 'Greens'
+            
+            fig_state_ranking = px.bar(
+                state_data,
+                x='Estado',
+                y='Value',
+                title=f'States by {ranking_metric} (Highest to Lowest)', # Updated title
+                text='Value',
+                color='Value',
+                color_continuous_scale=color_scale,
+                hover_data=['Percentage'] if 'Percentage' in state_data.columns else None
+            )
+            
+            # Format number display based on metric
+            if ranking_metric == "Branch Density (per 100k people)":
+                texttemplate = '%{y:.2f}'
+            else:
+                texttemplate = '%{y:,}'
+                
+            fig_state_ranking.update_traces(
+                texttemplate=texttemplate,
+                textposition='outside'
+            )
+            
+            # Custom hover template based on metric
+            if ranking_metric == "Bank Variety":
+                hovertemplate = '<b>State:</b> %{x}<br><b>Unique Banks:</b> %{y:,}<br><b>% of All Banks:</b> %{customdata[0]:.1f}%<extra></extra>'
             elif ranking_metric == "Branch Density (per 100k people)":
-                # Calculate branch density
-                density_data = calculate_branch_density(df)
-                if not density_data.empty:
-                    state_data = density_data[['estado', 'branches_per_100k']].copy()
-                    state_data.columns = ['Estado', 'Value']
-                    state_data['Metric'] = 'Branches per 100k people'
-                else:
-                    st.warning("Branch density data could not be calculated for all states.")
-                    state_data = pd.DataFrame(columns=['Estado', 'Value', 'Metric'])
-                    
-            elif ranking_metric == "Bank Variety":
-                # Calculate number of unique banks per state
-                bank_variety = df.groupby('estado')['banco'].nunique().reset_index()
-                bank_variety.columns = ['Estado', 'Value']
-                bank_variety['Metric'] = 'Unique Banks'
+                hovertemplate = '<b>State:</b> %{x}<br><b>Branches per 100k:</b> %{y:.2f}<extra></extra>'
+            else:
+                hovertemplate = '<b>State:</b> %{x}<br><b>Total Branches:</b> %{y:,}<extra></extra>'
                 
-                # Calculate percentage of all banks present
-                total_banks = df['banco'].nunique()
-                bank_variety['Percentage'] = bank_variety['Value'].apply(lambda x: round((x / total_banks * 100), 1))
-                state_data = bank_variety
+            fig_state_ranking.update_traces(
+                hovertemplate=hovertemplate
+            )
             
-            # Sort the data based on user selection
-            ascending = sort_order == "Lowest to Highest"
-            state_data = state_data.sort_values('Value', ascending=ascending)
+            fig_state_ranking.update_layout(
+                height=500,
+                xaxis_title="",
+                yaxis_title=state_data['Metric'].iloc[0] if not state_data.empty else ranking_metric, # Handle empty df case
+                xaxis_tickangle=-45,
+                margin=dict(l=50, r=50, t=50, b=120)
+            )
             
-            # Limit to the selected number of states
-            state_data = state_data.head(display_n_states)
-            
-            # Display based on user selection
-            if display_type == "Bar Chart":
-                # Create the chart
-                color_scale = 'Reds' if ranking_metric != "Bank Variety" else 'Greens'
-                
-                fig_state_ranking = px.bar(
-                    state_data,
-                    x='Estado',
-                    y='Value',
-                    title=f'States by {ranking_metric} ({sort_order})',
-                    text='Value',
-                    color='Value',
-                    color_continuous_scale=color_scale,
-                    hover_data=['Percentage'] if 'Percentage' in state_data.columns else None
-                )
-                
-                # Format number display based on metric
-                if ranking_metric == "Branch Density (per 100k people)":
-                    texttemplate = '%{y:.2f}'
-                else:
-                    texttemplate = '%{y:,}'
-                    
-                fig_state_ranking.update_traces(
-                    texttemplate=texttemplate,
-                    textposition='outside'
-                )
-                
-                # Custom hover template based on metric
-                if ranking_metric == "Bank Variety":
-                    hovertemplate = '<b>State:</b> %{x}<br><b>Unique Banks:</b> %{y:,}<br><b>% of All Banks:</b> %{customdata[0]:.1f}%<extra></extra>'
-                elif ranking_metric == "Branch Density (per 100k people)":
-                    hovertemplate = '<b>State:</b> %{x}<br><b>Branches per 100k:</b> %{y:.2f}<extra></extra>'
-                else:
-                    hovertemplate = '<b>State:</b> %{x}<br><b>Total Branches:</b> %{y:,}<extra></extra>'
-                    
-                fig_state_ranking.update_traces(
-                    hovertemplate=hovertemplate
-                )
-                
-                fig_state_ranking.update_layout(
-                    height=500,
-                    xaxis_title="",
-                    yaxis_title=state_data['Metric'].iloc[0],
-                    xaxis_tickangle=-45,
-                    margin=dict(l=50, r=50, t=50, b=120)
-                )
-                
-                st.plotly_chart(fig_state_ranking, use_container_width=True)
-                
-            else:  # Display as table
-                # Format the data for display
-                display_df = state_data.copy()
-                if 'Percentage' in display_df.columns:
-                    display_df['Percentage'] = display_df['Percentage'].apply(lambda x: f"{x:.1f}%")
-                
-                if ranking_metric == "Branch Density (per 100k people)":
-                    display_df['Value'] = display_df['Value'].apply(lambda x: f"{x:.2f}")
-                else:
-                    display_df['Value'] = display_df['Value'].apply(lambda x: f"{x:,}")
-                
-                # Rename columns for display
-                display_df = display_df.rename(columns={
-                    'Value': ranking_metric
-                })
-                
-                # Drop the Metric column as it's redundant in the table
-                if 'Metric' in display_df.columns:
-                    display_df = display_df.drop('Metric', axis=1)
-                
-                # Display the table
-                st.dataframe(
-                    display_df.set_index('Estado'),
-                    use_container_width=True,
-                    height=min(35 * (len(display_df) + 1), 500)
-                )
+            st.plotly_chart(fig_state_ranking, use_container_width=True)
+        else:
+            st.warning("No data available for the selected ranking metric.")
     
     # -- Tab 2: Bank Presence by State --
     with geo_tab2:
-        st.markdown("<h3>Bank Market Share by State (100% Stacked Bars)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3>Bank Market Share by State</h3>", unsafe_allow_html=True)
         
         # State selection for market share analysis
         all_states = sorted(df['estado'].unique())
@@ -1839,15 +1826,31 @@ def run_streamlit_ui():
             # Filter data for selected states
             market_df = df[df['estado'].isin(selected_market_states)]
             
-            # Bank selection for market share analysis
-            all_banks_in_states = sorted(market_df['banco'].unique())
-            top_banks_in_states = market_df['banco'].value_counts().nlargest(10).index.tolist()
+            # --- Controls for Bank Selection and Chart Type ---
+            control_col1, control_col2 = st.columns(2)
             
-            selected_market_banks = st.multiselect(
-                "Select banks to include (or leave empty for all banks):",
-                options=all_banks_in_states,
-                default=[]
-            )
+            with control_col1:
+                # Bank selection for market share analysis
+                all_banks_in_states = sorted(market_df['banco'].unique())
+                top_banks_in_states = market_df['banco'].value_counts().nlargest(10).index.tolist()
+                
+                selected_market_banks = st.multiselect(
+                    "Filter banks (or leave empty for all):",
+                    options=all_banks_in_states,
+                    default=[]
+                )
+                
+            with control_col2:
+                # Select bar mode (absolute vs relative)
+                bar_mode_option = st.radio(
+                    "Chart Display Type:",
+                    options=["Absolute Branch Count", "Percentage (100% Stacked)"],
+                    horizontal=True
+                )
+                barmode = 'stack' if bar_mode_option == "Absolute Branch Count" else 'relative'
+                yaxis_title = "Branch Count" if barmode == 'stack' else "Market Share (%)"
+                chart_title = f'Bank Branch Distribution by State ({len(selected_market_states)} states selected)' if barmode == 'stack' else f'Bank Market Share by State ({len(selected_market_states)} states selected)'
+            # --- End Controls ---
             
             # Filter by selected banks if any
             if selected_market_banks:
@@ -1859,12 +1862,12 @@ def run_streamlit_ui():
             # Calculate percentage within each state
             state_totals = bank_state_counts.groupby('estado')['Count'].transform('sum')
             bank_state_counts['Percentage'] = bank_state_counts.apply(
-                lambda row: round((row['Count'] / state_totals[row.name] * 100), 1), 
+                lambda row: round((row['Count'] / state_totals[row.name] * 100), 1) if state_totals[row.name] > 0 else 0, 
                 axis=1
             )
             
-            # Sort states by total branches
-            state_order = bank_state_counts.groupby('estado')['Count'].sum().sort_values(ascending=False).index.tolist()
+            # Sort states by total branches in ASCENDING order (for top-to-bottom display)
+            state_order = bank_state_counts.groupby('estado')['Count'].sum().sort_values(ascending=True).index.tolist()
             
             # Filter to top banks for better visualization if there are many banks and user didn't select specific ones
             if not selected_market_banks and len(all_banks_in_states) > 15:
@@ -1883,7 +1886,13 @@ def run_streamlit_ui():
                     other_banks_count = state_data['Count'].sum() - top_state_data['Count'].sum()
                     
                     if other_banks_count > 0:
-                        other_pct = 100 - top_state_data['Percentage'].sum()
+                        # Calculate percentage for others based on barmode
+                        if barmode == 'relative':
+                             other_pct = max(0, 100 - top_state_data['Percentage'].sum()) # Avoid negative due to rounding
+                        else:
+                            # For absolute stack, percentage is less direct, store count
+                             other_pct = np.nan # Percentage is less relevant here
+                             
                         others_df.append({
                             'estado': state,
                             'banco': 'Otros Bancos',
@@ -1900,62 +1909,85 @@ def run_streamlit_ui():
             else:
                 plot_data = bank_state_counts
             
-            # Create the 100% stacked bar chart
+            # --- Sort data for consistent stacking order (largest banks at the bottom/left) ---
+            # Ensure the state order is applied first, then sort by count descending within each state
+            plot_data['estado_cat'] = pd.Categorical(plot_data['estado'], categories=state_order, ordered=True)
+            plot_data = plot_data.sort_values(by=['estado_cat', 'Count'], ascending=[True, False])
+            # --------------------------------------------------------------------------------
+            
+            # --- Create the stacked bar chart ---
+            # Determine y-axis value based on selected mode
+            x_value = 'Count' if barmode == 'stack' else 'Percentage'
+            
             fig_market_share = px.bar(
                 plot_data,
-                x='estado',
-                y='Percentage',
-                color='banco',
-                title=f'Bank Market Share by State ({len(selected_market_states)} states selected)',
-                category_orders={"estado": state_order},
-                barmode='stack',
-                text='Percentage',
-                hover_data=['Count']
+                y='estado', # Changed to y-axis for horizontal bars
+                x=x_value,  # Changed to x-axis
+                color='banco', # Color by bank
+                title=chart_title,
+                # category_orders={"estado": state_order}, # Order applied by sorting the dataframe
+                barmode=barmode,
+                text=x_value, # Show Count or Percentage as text
+                hover_data=['Count', 'Percentage'],
+                orientation='h', # Set orientation to horizontal
+                color_discrete_map=bank_color_map # Use the pre-defined bank color map
             )
             
-            # Customize text display - only show percentage for segments > 5%
-            fig_market_share.update_traces(
-                texttemplate='%{text:.1f}%',
-                textposition='inside',
-                textfont=dict(size=10, color="white"),
-                insidetextanchor='middle',
-                hovertemplate='<b>State:</b> %{x}<br><b>Bank:</b> %{fullData.name}<br><b>Share:</b> %{y:.1f}%<br><b>Branches:</b> %{customdata[0]}<extra></extra>'
-            )
+            # Customize text display and hovertemplate
+            if barmode == 'relative':
+                 # Only show percentage for segments > 5%
+                fig_market_share.update_traces(
+                    texttemplate='%{text:.1f}%',
+                    textposition='inside',
+                    textfont=dict(size=10, color="white"),
+                    insidetextanchor='middle',
+                    # Correct hovertemplate for relative mode
+                    hovertemplate='<b>State:</b> %{y}<br><b>Bank:</b> %{fullData.name}<br><b>Share:</b> %{x:.1f}%<br><b>Branches:</b> %{customdata[0]:,}<extra></extra>'
+                )
+            else: # Absolute stack
+                 fig_market_share.update_traces(
+                    texttemplate='%{text:,}', # Format count with comma
+                    textposition='inside',
+                    textfont=dict(size=10, color="white"),
+                    insidetextanchor='middle',
+                    # Correct hovertemplate for stack mode (use customdata for %)
+                    hovertemplate='<b>State:</b> %{y}<br><b>Bank:</b> %{fullData.name}<br><b>Branches:</b> %{x:,}<br><b>Share:</b> %{customdata[1]:.1f}%<extra></extra>'
+                 )
             
             # Apply a fixed height based on number of states
             fig_market_share.update_layout(
-                height=max(400, len(selected_market_states) * 50),
-                xaxis_title="State",
-                yaxis_title="Market Share (%)",
-                yaxis_range=[0, 100],
-                yaxis_ticksuffix="%",
+                height=max(500, len(selected_market_states) * 50), # Increased min height
+                yaxis_title="State", # Changed yaxis title
+                xaxis_title=yaxis_title, # Changed xaxis title (dynamic based on mode)
+                xaxis_range=[0, 100] if barmode == 'relative' else None, # Set range only for relative mode
+                xaxis_ticksuffix="%" if barmode == 'relative' else None, # Apply suffix to x-axis
                 legend_title_text='Bank',
-                margin=dict(l=50, r=50, t=50, b=50)
+                margin=dict(l=150, r=50, t=50, b=50) # Increased left margin for state names
             )
             
             st.plotly_chart(fig_market_share, use_container_width=True)
             
-            # Add a data table with the exact figures
-            with st.expander("View detailed market share data"):
-                detail_data = plot_data.pivot_table(
-                    values=['Count', 'Percentage'],
-                    index='banco',
-                    columns='estado',
-                    fill_value=0
-                )
-                
-                # Flatten the hierarchical columns
-                detail_data.columns = [f"{col[1]} ({col[0]})" for col in detail_data.columns]
-                
-                # Add a total column
-                if 'Count' in bank_state_counts.columns:
-                    bank_totals = bank_state_counts.groupby('banco')['Count'].sum()
-                    detail_data['Total Branches'] = bank_totals
-                
-                # Sort by total branches
-                detail_data = detail_data.sort_values('Total Branches', ascending=False)
-                
-                st.dataframe(detail_data, use_container_width=True)
+            # --- Display detailed market share data table below the chart ---
+            st.markdown("<h4>Detailed Market Share Data</h4>", unsafe_allow_html=True)
+            detail_data = plot_data.pivot_table(
+                values=['Count', 'Percentage'],
+                index='banco',
+                columns='estado',
+                fill_value=0
+            )
+            
+            # Flatten the hierarchical columns
+            detail_data.columns = [f"{col[1]} ({col[0]})" for col in detail_data.columns]
+            
+            # Add a total column
+            if 'Count' in bank_state_counts.columns:
+                bank_totals = bank_state_counts.groupby('banco')['Count'].sum()
+                detail_data['Total Branches'] = bank_totals
+            
+            # Sort by total branches
+            detail_data = detail_data.sort_values('Total Branches', ascending=False)
+            
+            st.dataframe(detail_data, use_container_width=True)
         
         else:
             st.info("Please select at least one state to analyze market share.")
@@ -1966,29 +1998,36 @@ def run_streamlit_ui():
         
         # Define regions (adjusted for state names in the dataset)
         regions = {
-            'Norte': ['Baja California', 'Baja California Sur', 'Chihuahua', 'Coahuila de Zaragoza'],
-            'Centro-Norte': ['Aguascalientes'],
-            'Centro': ['Ciudad de México', 'Colima'],
-            'Sur-Sureste': ['Chiapas', 'Campeche']
+            'Norte': ['Baja California', 'Baja California Sur', 'Chihuahua', 'Coahuila de Zaragoza', 'Nuevo León', 'Sonora', 'Tamaulipas'], # Added more northern states
+            'Centro-Norte': ['Aguascalientes', 'Durango', 'San Luis Potosí', 'Zacatecas'], # Added more central-north states
+            'Centro-Occidente': ['Colima', 'Guanajuato', 'Jalisco', 'Michoacán', 'Nayarit', 'Querétaro'], # Defined Centro-Occidente
+            'Centro-Sur': ['Ciudad de México', 'Estado de México', 'Guerrero', 'Hidalgo', 'Morelos', 'Puebla', 'Tlaxcala'], # Defined Centro-Sur
+            'Sur-Sureste': ['Campeche', 'Chiapas', 'Oaxaca', 'Quintana Roo', 'Tabasco', 'Veracruz', 'Yucatán'] # Expanded Sur-Sureste
         }
         
-        # Map states to regions
+        # Map states to regions - handle potential missing states
         df['region'] = df['estado'].map({state: region for region, states in regions.items() for state in states})
+        df['region'] = df['region'].fillna('Unknown') # Assign unmapped states to 'Unknown'
         
+        # Exclude 'Unknown' region from analysis if present
+        regional_df = df[df['region'] != 'Unknown']
+        defined_regions = [r for r in regions if r in regional_df['region'].unique()] # Only use regions present in data
+
         # Calculate regional statistics
         region_stats = []
         
-        for region in regions:
-            region_df = df[df['region'] == region]
+        # Use regional_df and defined_regions for calculations
+        for region in defined_regions:
+            region_data = regional_df[regional_df['region'] == region]
             
-            if len(region_df) > 0:
-                states_count = region_df['estado'].nunique()
-                branches_count = len(region_df)
-                banks_count = region_df['banco'].nunique()
+            if len(region_data) > 0:
+                states_count = region_data['estado'].nunique()
+                branches_count = len(region_data)
+                banks_count = region_data['banco'].nunique()
                 
                 # Population data for the region
                 region_states = regions[region]
-                region_population = sum([STATE_POPULATIONS_UPDATED.get(state, 0) for state in region_states])
+                region_population = sum([STATE_DATA.get(state, {}).get('population', 0) for state in region_states])
                 
                 # Branch density
                 if region_population > 0:
@@ -1997,7 +2036,7 @@ def run_streamlit_ui():
                     branches_per_100k = 0
                 
                 # Top banks
-                top_banks = region_df['banco'].value_counts().nlargest(3)
+                top_banks = region_data['banco'].value_counts().nlargest(3)
                 top_bank_names = ", ".join(top_banks.index.tolist())
                 
                 region_stats.append({
@@ -2008,50 +2047,29 @@ def run_streamlit_ui():
                     'Population': region_population,
                     'Branches per 100k': branches_per_100k,
                     'Top Banks': top_bank_names,
-                    'Branch %': round((branches_count / len(df) * 100), 1)
+                    'Branch %': round((branches_count / len(regional_df) * 100), 1) # Use regional_df length for percentage
                 })
         
         region_stats_df = pd.DataFrame(region_stats)
         
-        # Create regional comparison
-        col1, col2 = st.columns([2, 3])
+        # --- Display Regional Visualization First ---
+        st.markdown("<h4>Regional Branch Distribution</h4>", unsafe_allow_html=True)
         
-        with col1:
-            # Regional statistics table
-            st.markdown("<h4>Regional Summary</h4>", unsafe_allow_html=True)
-            
-            # Format the population nicely
-            region_stats_df['Population'] = region_stats_df['Population'].apply(lambda x: f"{x:,}")
-            
-            # Format branches nicely
-            region_stats_df['Branches'] = region_stats_df['Branches'].apply(lambda x: f"{x:,}")
-            
-            # Add % sign to Branch %
-            region_stats_df['Branch %'] = region_stats_df['Branch %'].apply(lambda x: f"{x}%")
-            
-            # Display statistics
-            st.dataframe(
-                region_stats_df.set_index('Region'),
-                use_container_width=True
-            )
+        # Choose visualization type
+        viz_type = st.radio(
+            "Visualization type:",
+            options=["Branch Count", "Branch Density", "Bank Variety"],
+            horizontal=True,
+            key="regional_viz_type" # Add key to avoid conflict
+        )
         
-        with col2:
-            # Regional visualization
-            st.markdown("<h4>Regional Branch Distribution</h4>", unsafe_allow_html=True)
-            
-            # Choose visualization type
-            viz_type = st.radio(
-                "Visualization type:",
-                options=["Branch Count", "Branch Density", "Bank Variety"],
-                horizontal=True
-            )
-            
+        if not region_stats_df.empty:
             if viz_type == "Branch Count":
                 metric = "Branches"
                 plot_df = pd.DataFrame({
                     'Region': region_stats_df['Region'],
-                    'Value': region_stats_df['Branches'].apply(lambda x: int(x.replace(',', ''))),
-                    'Percentage': region_stats_df['Branch %'].apply(lambda x: float(x.replace('%', '')))
+                    'Value': region_stats_df['Branches'], # Keep as number for sorting
+                    'Percentage': region_stats_df['Branch %'] # Keep as number for hover
                 })
                 color_scale = 'Reds'
                 
@@ -2060,7 +2078,7 @@ def run_streamlit_ui():
                 plot_df = pd.DataFrame({
                     'Region': region_stats_df['Region'],
                     'Value': region_stats_df['Branches per 100k'],
-                    'Population': region_stats_df['Population']
+                    'Population': region_stats_df['Population'] # Keep as number for hover
                 })
                 color_scale = 'Oranges'
                 
@@ -2088,15 +2106,18 @@ def run_streamlit_ui():
             if viz_type == "Branch Count":
                 hovertemplate = '<b>Region:</b> %{x}<br><b>Branches:</b> %{y:,}<br><b>% of Total:</b> %{customdata:.1f}%<extra></extra>'
                 customdata = plot_df['Percentage']
+                texttemplate = '%{y:,}'
             elif viz_type == "Branch Density":
-                hovertemplate = '<b>Region:</b> %{x}<br><b>Branches per 100k:</b> %{y:.2f}<br><b>Population:</b> %{customdata}<extra></extra>'
+                hovertemplate = '<b>Region:</b> %{x}<br><b>Branches per 100k:</b> %{y:.2f}<br><b>Population:</b> %{customdata:,}<extra></extra>'
                 customdata = plot_df['Population']
+                texttemplate = '%{y:.2f}'
             else:  # Bank Variety
                 hovertemplate = '<b>Region:</b> %{x}<br><b>Banks Present:</b> %{y:,}<br><b>Top Banks:</b> %{customdata}<extra></extra>'
                 customdata = plot_df['Top Banks']
+                texttemplate = '%{y:,}'
             
             fig_region.update_traces(
-                texttemplate='%{y:,}' if viz_type != "Branch Density" else '%{y:.2f}',
+                texttemplate=texttemplate,
                 textposition='outside',
                 hovertemplate=hovertemplate,
                 customdata=customdata
@@ -2110,6 +2131,28 @@ def run_streamlit_ui():
             )
             
             st.plotly_chart(fig_region, use_container_width=True)
+        else:
+            st.warning("No data available for regional analysis.")
+
+        # --- Display Regional Statistics Table Below ---
+        st.markdown("<h4>Regional Summary Table</h4>", unsafe_allow_html=True)
+        
+        if not region_stats_df.empty:
+            # Format the population nicely
+            region_stats_df['Population'] = region_stats_df['Population'].apply(lambda x: f"{x:,}")
+            # Format branches nicely
+            region_stats_df['Branches'] = region_stats_df['Branches'].apply(lambda x: f"{x:,}")
+            # Add % sign to Branch %
+            region_stats_df['Branch %'] = region_stats_df['Branch %'].apply(lambda x: f"{x}%")
+            
+            # Display statistics
+            st.dataframe(
+                region_stats_df.set_index('Region'),
+                use_container_width=True
+            )
+        else:
+             st.warning("No data available for the regional summary table.")
+
         
         # Regional bank presence analysis
         st.markdown("<h4>Bank Presence by Region</h4>", unsafe_allow_html=True)
@@ -2120,91 +2163,98 @@ def run_streamlit_ui():
             min_value=5,
             max_value=20,
             value=10,
-            step=1
+            step=1,
+            key="regional_top_n_banks" # Add key
         )
         
-        # Get top banks overall
-        top_banks_overall = df['banco'].value_counts().nlargest(top_n_regional).index.tolist()
+        # Get top banks overall from the regional data
+        top_banks_overall = regional_df['banco'].value_counts().nlargest(top_n_regional).index.tolist()
         
-        # Calculate bank presence by region
+        # Calculate bank presence by region using regional_df
         region_bank_data = []
         
         for bank in top_banks_overall:
-            bank_df = df[df['banco'] == bank]
-            total_branches = len(bank_df)
+            bank_df_regional = regional_df[regional_df['banco'] == bank]
+            total_branches_regional = len(bank_df_regional)
             
-            for region in regions:
-                region_branches = len(bank_df[bank_df['region'] == region])
+            for region in defined_regions: # Iterate over defined regions only
+                region_branches = len(bank_df_regional[bank_df_regional['region'] == region])
                 if region_branches > 0:
                     region_bank_data.append({
                         'Bank': bank,
                         'Region': region,
                         'Branches': region_branches,
-                        'Bank Total': total_branches,
-                        'Region Share': round((region_branches / total_branches * 100), 1)
+                        'Bank Total (in regions)': total_branches_regional, # Clarify total is within defined regions
+                        'Region Share (%)': round((region_branches / total_branches_regional * 100), 1) if total_branches_regional > 0 else 0
                     })
         
         region_bank_df = pd.DataFrame(region_bank_data)
         
-        # Create a heatmap of bank presence across regions
-        bank_region_pivot = region_bank_df.pivot_table(
-            values='Branches',
-            index='Bank',
-            columns='Region',
-            fill_value=0
-        )
-        
-        # Add a total column
-        bank_region_pivot['Total'] = bank_region_pivot.sum(axis=1)
-        
-        # Sort by total
-        bank_region_pivot = bank_region_pivot.sort_values('Total', ascending=False)
-        
-        # Drop the total column for visualization
-        plot_pivot = bank_region_pivot.drop('Total', axis=1)
-        
-        # Create two different visualizations
-        viz_option = st.radio(
-            "Visualization option:",
-            options=["Absolute Branch Count", "Regional Distribution (%)"],
-            horizontal=True
-        )
-        
-        if viz_option == "Regional Distribution (%)":
-            # Normalize to show distribution pattern
-            plot_data = plot_pivot.div(plot_pivot.sum(axis=1), axis=0) * 100
-            colorscale = "Blues"
-            title = "Regional Distribution of Bank Branches (%)"
-            colorbar_title = "% of Bank Branches"
-            hovertemplate = '<b>Bank:</b> %{y}<br><b>Region:</b> %{x}<br><b>Share:</b> %{z:.1f}%<extra></extra>'
+        if not region_bank_df.empty:
+            # Create a heatmap of bank presence across regions
+            bank_region_pivot = region_bank_df.pivot_table(
+                values='Branches',
+                index='Bank',
+                columns='Region',
+                fill_value=0
+            )
+            
+            # Add a total column
+            bank_region_pivot['Total Branches'] = bank_region_pivot.sum(axis=1)
+            
+            # Sort by total
+            bank_region_pivot = bank_region_pivot.sort_values('Total Branches', ascending=False)
+            
+            # Drop the total column for visualization
+            plot_pivot = bank_region_pivot.drop('Total Branches', axis=1)
+            
+            # Create two different visualizations
+            viz_option = st.radio(
+                "Visualization option:",
+                options=["Absolute Branch Count", "Regional Distribution (%)"],
+                horizontal=True,
+                key="regional_heatmap_viz" # Add key
+            )
+            
+            if viz_option == "Regional Distribution (%)":
+                # Normalize to show distribution pattern
+                plot_data = plot_pivot.div(plot_pivot.sum(axis=1), axis=0) * 100
+                colorscale = "Greens" # Apply Greens color scale
+                title = "Regional Distribution of Bank Branches (%)"
+                colorbar_title = "% of Bank Branches"
+                hovertemplate = '<b>Bank:</b> %{y}<br><b>Region:</b> %{x}<br><b>Share:</b> %{z:.1f}%<extra></extra>'
+                text_auto_format = ".1f"
+            else:
+                # Use absolute numbers
+                plot_data = plot_pivot
+                colorscale = "Greens" # Apply Greens color scale
+                title = "Branch Count by Bank and Region"
+                colorbar_title = "Branch Count"
+                hovertemplate = '<b>Bank:</b> %{y}<br><b>Region:</b> %{x}<br><b>Branches:</b> %{z:,}<extra></extra>'
+                text_auto_format = True
+            
+            fig_region_heatmap = px.imshow(
+                plot_data,
+                title=title,
+                labels=dict(x="Region", y="Bank", color=colorbar_title),
+                color_continuous_scale=colorscale, # Use selected colorscale
+                aspect="auto",
+                text_auto=text_auto_format
+            )
+            
+            fig_region_heatmap.update_traces(
+                hovertemplate=hovertemplate,
+                texttemplate=f"%{{z:{',.1f' if viz_option == 'Regional Distribution (%)' else ','}}} {'%' if viz_option == 'Regional Distribution (%)' else ''}" # Simplified texttemplate
+            )
+            
+            fig_region_heatmap.update_layout(
+                height=max(400, len(top_banks_overall) * 30),
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
+            
+            st.plotly_chart(fig_region_heatmap, use_container_width=True)
         else:
-            # Use absolute numbers
-            plot_data = plot_pivot
-            colorscale = "Viridis"
-            title = "Branch Count by Bank and Region"
-            colorbar_title = "Branch Count"
-            hovertemplate = '<b>Bank:</b> %{y}<br><b>Region:</b> %{x}<br><b>Branches:</b> %{z:,}<extra></extra>'
-        
-        fig_region_heatmap = px.imshow(
-            plot_data,
-            title=title,
-            labels=dict(x="Region", y="Bank", color=colorbar_title),
-            color_continuous_scale=colorscale,
-            aspect="auto",
-            text_auto=".1f" if viz_option == "Regional Distribution (%)" else True
-        )
-        
-        fig_region_heatmap.update_traces(
-            hovertemplate=hovertemplate,
-            texttemplate="%{z:.1f}%" if viz_option == "Regional Distribution (%)" else "%{z:,}"
-        )
-        
-        fig_region_heatmap.update_layout(
-            height=max(400, len(top_banks_overall) * 30),
-            margin=dict(l=50, r=50, t=50, b=50)
-        )
-        
-        st.plotly_chart(fig_region_heatmap, use_container_width=True)
+             st.warning("No data available for bank presence by region heatmap based on current filters.")
 
 
     # ----- ENHANCED DEMOGRAPHIC AND ACCESSIBILITY ANALYSIS -----
@@ -2212,7 +2262,7 @@ def run_streamlit_ui():
     st.markdown("<h1 class='main-header'>📊 Demographic & Accessibility Analysis</h1>", unsafe_allow_html=True)
     
     # --- DEBUG: Print unique states in df before demographic analysis ---
-    st.write(f"DEBUG: States in df for demographic analysis: {sorted(df['estado'].unique())}")
+    #st.write(f"DEBUG: States in df for demographic analysis: {sorted(df['estado'].unique())}")
     # ---------------------------------------------------------------------
 
     demo_tab1, demo_tab2 = st.tabs(["📈 Population Demographics", "🚶‍♂️ Branch Accessibility"])
@@ -2353,39 +2403,39 @@ def run_streamlit_ui():
         st.plotly_chart(fig_bubble, use_container_width=True)
         
         # Correlation analysis between demographics and banking presence
-        st.markdown("<h4>Correlation Analysis</h4>", unsafe_allow_html=True)
+        #st.markdown("<h4>Correlation Analysis</h4>", unsafe_allow_html=True)
         
         # Calculate correlations between demographic factors and branch density
-        correlation_metrics = [
-            "Población", "Población_adulta_porcentaje", "Superficie_km2", 
-            "Urbanización_porcentaje", "PIB_per_cápita", "Sucursales_por_100k"
-        ]
+        #correlation_metrics = [
+        #    "Población", "Población_adulta_porcentaje", "Superficie_km2", 
+        #    "Urbanización_porcentaje", "PIB_per_cápita", "Sucursales_por_100k"
+        #]
         
-        corr_matrix = state_df[correlation_metrics].corr()
+        #corr_matrix = state_df[correlation_metrics].corr()
         
         # Create a heatmap of the correlations
-        fig_corr = px.imshow(
-            corr_matrix,
-            text_auto=".2f",
-            color_continuous_scale="RdBu_r",
-            title="Correlation Between Demographic Factors and Banking Presence",
-            labels=dict(x="Factors", y="Factors", color="Correlation")
-        )
+        #fig_corr = px.imshow(
+        #    corr_matrix,
+        #    text_auto=".2f",
+        #    color_continuous_scale="RdBu_r",
+        #    title="Correlation Between Demographic Factors and Banking Presence",
+        #    labels=dict(x="Factors", y="Factors", color="Correlation")
+        #)
         
         # Rename axis labels with display names
-        fig_corr.update_xaxes(ticktext=[metric_display_names[m] for m in correlation_metrics], 
-                            tickvals=list(range(len(correlation_metrics))))
-        fig_corr.update_yaxes(ticktext=[metric_display_names[m] for m in correlation_metrics], 
-                            tickvals=list(range(len(correlation_metrics))))
+        #fig_corr.update_xaxes(ticktext=[metric_display_names[m] for m in correlation_metrics], 
+        #                    tickvals=list(range(len(correlation_metrics))))
+        #fig_corr.update_yaxes(ticktext=[metric_display_names[m] for m in correlation_metrics], 
+        #                    tickvals=list(range(len(correlation_metrics))))
         
-        st.plotly_chart(fig_corr, use_container_width=True)
+        #st.plotly_chart(fig_corr, use_container_width=True)
         
-        with st.expander("View Detailed State Demographic Data"):
-            # Display the data in a table
-            display_df = state_df.copy()
-            # Rename columns for display
-            display_df.columns = [metric_display_names.get(col, col) for col in display_df.columns]
-            st.dataframe(display_df.set_index("Estado"), use_container_width=True)
+        #with st.expander("View Detailed State Demographic Data"):
+        #    # Display the data in a table
+        #    display_df = state_df.copy()
+        #    # Rename columns for display
+        #    display_df.columns = [metric_display_names.get(col, col) for col in display_df.columns]
+        #    st.dataframe(display_df.set_index("Estado"), use_container_width=True)
     
     # -- Tab 2: Branch Accessibility --
     with demo_tab2:
@@ -2460,28 +2510,6 @@ def run_streamlit_ui():
         bank_counts = original_state_df['banco'].value_counts().reset_index()
         bank_counts.columns = ['Bank', 'Number of Branches']
         
-        if not bank_counts.empty:
-            st.markdown("<h4>Branch Distribution by Bank</h4>", unsafe_allow_html=True)
-            
-            # Create a bar chart for bank branch counts
-            fig_bank_counts = px.bar(
-                bank_counts.head(top_n_banks),
-                y='Bank',
-                x='Number of Branches',
-                title=f"Top {top_n_banks} Banks by Branch Count in {selected_access_state}",
-                orientation='h',
-                color='Number of Branches',
-                color_continuous_scale='Viridis'
-            )
-            
-            fig_bank_counts.update_layout(
-                xaxis_title="Number of Branches",
-                yaxis_title="",
-                height=400
-            )
-            
-            st.plotly_chart(fig_bank_counts, use_container_width=True)
-        
         # Accessibility map with isochrones
         st.markdown("<h4>Accessibility Map</h4>", unsafe_allow_html=True)
         
@@ -2503,6 +2531,28 @@ def run_streamlit_ui():
                 options=[5, 10, 15, 20, 30],
                 value=10
             )
+
+        if not bank_counts.empty:
+            st.markdown("<h4>Branch Distribution by Bank</h4>", unsafe_allow_html=True)
+            
+            # Create a bar chart for bank branch counts
+            fig_bank_counts = px.bar(
+                bank_counts.head(top_n_banks),
+                y='Bank',
+                x='Number of Branches',
+                title=f"Top {top_n_banks} Banks by Branch Count in {selected_access_state}",
+                orientation='h',
+                color='Number of Branches',
+                color_continuous_scale='Viridis'
+            )
+            
+            fig_bank_counts.update_layout(
+                xaxis_title="Number of Branches",
+                yaxis_title="",
+                height=400
+            )
+            
+            st.plotly_chart(fig_bank_counts, use_container_width=True)
         
         # More realistic travel distance estimation
         # Average walking speed is about 5 km/h = 83.33 meters per minute
