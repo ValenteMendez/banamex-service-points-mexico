@@ -1212,7 +1212,7 @@ def run_streamlit_ui():
 
     with st.expander("2. Enhance Service Offerings & Accessibility", expanded=True):
             st.markdown(f"- **Prioritize Accessibility Upgrades:** Target states with the lowest overall accessibility scores with improvements regarding ramps, parking, and potentially dollar exchange where relevant.")
-            st.markdown("- **Leverage Branch Clustering Insights:** Tailor services or marketing based on identified branch profiles (from the Clustering section). E.g., Promote specialized services at 'Full-Service Hub' clusters, or ensure basic transaction efficiency at 'ATM-Heavy' clusters.")
+            st.markdown("- **Leverage Branch Clustering Insights:** Tailor services or marketing based on identified branch profiles (from the Clustering section). For example, promote specialized services at 'Full-Service Hub' clusters, or ensure basic transaction efficiency at 'ATM-heavy' clusters.")
             st.markdown("- **Improve Digital Integration:** Promote digital channel adoption strongly in areas with lower physical branch density to maintain service levels. Ensure seamless online-to-offline experience.")
     
     with st.expander("3. Operational Efficiency", expanded=True):
