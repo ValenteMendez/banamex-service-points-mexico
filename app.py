@@ -1075,7 +1075,7 @@ def run_streamlit_ui():
     st.markdown("--- ") # Add separator
 
     # --- Strategic Insights Section ---
-    st.markdown("<h1 class='main-header'>Strategic Insights & Recommendations</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>Strategic Insights</h1>", unsafe_allow_html=True)
     #st.markdown("<div class='info-box'>Synthesizing analysis findings into potential strategic actions regarding network expansion, service offerings, and accessibility improvements.</div>", unsafe_allow_html=True)
 
     # Underserved Areas Analysis
