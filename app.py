@@ -73,6 +73,13 @@ st.markdown("""
         font-weight: bold;
         color: #005599;
     }
+    /* Hide GitHub fork button and related elements */
+    .css-1fjgr1s, /* Fork button */
+    .css-1fjgr1s + div, /* GitHub icon */
+    .css-1fjgr1s + div + div /* Three dots menu */
+    {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
