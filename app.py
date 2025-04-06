@@ -269,7 +269,7 @@ def get_service_type_names():
     """Return mapping of service type codes to names"""
     return {
         'has_regular_branch': 'Regular Branch', 'has_premium_branch': 'Premium Branch',
-        'has_atm': 'ATM', 'has_automatic_branch': 'Automatic Branch',
+        'has_atm': 'ATM (service points)', 'has_automatic_branch': 'Automatic Branch',
         'has_afore': 'AFORE Services', 'has_banamex_1': 'Banamex 1',
         'has_special_service': 'Special Services'
     }
@@ -738,7 +738,7 @@ def run_streamlit_ui():
         top_15_states_data,
         x='State',
         y='Number of Branches', 
-        title='Top 15 States by Number of Service Locations', # Updated Title
+        title='Top 15 States by Number of Service Locations (# of unique service point locations per state)', # Updated Title
         text='Number of Branches', 
         hover_data=['Percentage'] 
     )
@@ -753,7 +753,6 @@ def run_streamlit_ui():
         yaxis_title='Number of Service Locations' # Updated Y-axis label
     )
     st.plotly_chart(fig_state_bar, use_container_width=True)
-    st.caption("*Note: This chart counts the total number of unique service point locations per state.*") # Already reflects locations
 
     # --- Service Point Density Chart ---
     density_data = calculate_service_density(df) # Confirmed uses 2024 population data via STATE_POPULATIONS_UPDATED
@@ -763,7 +762,7 @@ def run_streamlit_ui():
             density_data_top_15, # Use top 15 data
             x='estado',
             y='locations_per_100k', # Use updated column name
-            title='Top 15 States by Service Location Density (Locations per 100k People)', # Updated Title from 10 to 15
+            title='Top 15 States by Service Location Density (locations per 100k People)', # Updated Title from 10 to 15
             text='locations_per_100k' # Use updated column name
         )
         fig_density.update_traces(
