@@ -645,7 +645,7 @@ def run_streamlit_ui():
     metrics = {
         "Total Service Points": len(df),
         "Regular Branches": df['has_regular_branch'].sum(),
-        "ATMs": df['has_atm'].sum(),
+        "ATMs (service points)": df['has_atm'].sum(),
         "States Covered": df['estado'].nunique()
     }
     cols = [col1, col2, col3, col4]
@@ -702,7 +702,7 @@ def run_streamlit_ui():
         service_descriptions = {
             'Regular Branch (Sucursales)': "Standard bank branches with teller services.",
             'Premium Branch (Priority)': "Premium banking locations with enhanced services.",
-            'ATM (Cajeros)': "Automated Teller Machines.",
+            'ATM (Cajeros)': "Automated Teller Machines. IMPORTANT: service points can have multiple machines.",
             'Automatic Branch (Cajeros Smart)': "Self-service banking locations.",
             'AFORE Services (Afore)': "Retirement fund administration services.",
             'Banamex 1 (Banca Privada)': "High-end private banking services.",
